@@ -1,6 +1,8 @@
 package model
 
 import (
+	"demo520/internal/pkg/log"
+	"demo520/pkg/auth"
 	"gorm.io/gorm"
 	"time"
 )
@@ -17,4 +19,14 @@ type User struct {
 
 func (u *User) TableName() string {
 	return "users"
+}
+
+func (u *User) BeforeCreate(tx *gorm.DB) error {
+	err := error(nil)
+	u.Password, err = auth.HashPassword(u.Password)
+	if err != nil {
+		log.Errorw("Error hashing password")
+		return err
+	}
+	return nil
 }
