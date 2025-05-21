@@ -1,0 +1,328 @@
+openapi: 3.1.0
+info:
+  title: Image Gallery API
+  version: 1.0.0
+  description: |
+    API for image management system with multi-modal model support
+
+servers:
+  - url: https://api.example.com/v1
+    description: Production server
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        created_at:
+          type: string
+          format: date-time
+
+    Image:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        owner_id:
+          type: string
+          format: uuid
+        visibility:
+          type: string
+          enum: [private, public]
+        storage_path:
+          type: string
+        description:
+          type: string
+          maxLength: 500
+        created_at:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+          description: For multi-modal model features
+          additionalProperties: true
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            type: string
+
+paths:
+  # 用户认证
+  /auth/register:
+    post:
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+                  minLength: 16
+      responses:
+        201:
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /auth/login:
+    post:
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        200:
+          description: Login success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  expires_in:
+                    type: integer
+
+  # 公开图片访问接口
+  /images:
+    get:
+      tags: [Images]
+      summary: 获取公开图片列表（无需登录）
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        200:
+          description: Public images list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Image'
+
+  /images/{image_id}:
+    get:
+      tags: [Images]
+      summary: 获取单个公开图片信息
+      parameters:
+        - name: image_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Image details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Image'
+        404:
+          description: Image not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /images/search:
+    get:
+      tags: [Images]
+      summary: 公开图片高级搜索（需要登录）
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          description: 搜索关键词
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        200:
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Image'
+
+  # 需要认证的图片操作接口
+  /authenticated/images:
+    post:
+      tags: [Images]
+      summary: 上传新图片（需要登录）
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                visibility:
+                  type: string
+                  enum: [private, public]
+                  default: private
+                description:
+                  type: string
+      responses:
+        201:
+          description: Image uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Image'
+
+  /authenticated/images/{image_id}:
+    patch:
+      tags: [Images]
+      summary: 更新图片属性（需要登录）
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: image_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                visibility:
+                  type: string
+                  enum: [private, public]
+                description:
+                  type: string
+      responses:
+        200:
+          description: Image updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Image'
+
+  # 收藏功能
+  /users/me/favorites:
+    get:
+      tags: [Favorites]
+      summary: 获取用户的收藏夹（需要登录）
+      security:
+        - BearerAuth: []
+      responses:
+        200:
+          description: Get user's favorites
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Image'
+
+    post:
+      tags: [Favorites]
+      summary: 添加图片到收藏夹（需要登录）
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                image_id:
+                  type: string
+                  format: uuid
+      responses:
+        201:
+          description: Image added to favorites
+
+  /users/me/favorites/{image_id}:
+    delete:
+      tags: [Favorites]
+      summary: 从收藏夹移除图片（需要登录）
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: image_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        204:
+          description: Favorite removed
