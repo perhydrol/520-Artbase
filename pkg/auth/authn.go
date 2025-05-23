@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	KeyLen  = 32
+	keyLen  = 32
 	saltLen = 32
 	time    = 3
 	memory  = 64 * 1024
@@ -29,7 +29,7 @@ func generateSalt() []byte {
 
 func HashPassword(password string) (string, error) {
 	salt := generateSalt()
-	hash := argon2.IDKey([]byte(password), salt, time, memory, threads, KeyLen)
+	hash := argon2.IDKey([]byte(password), salt, time, memory, threads, keyLen)
 
 	b64Salt := base64.StdEncoding.EncodeToString(salt)
 	b64Hash := base64.StdEncoding.EncodeToString(hash)
@@ -49,7 +49,7 @@ func VerifyPassword(password string, hash string) bool {
 		log.Errorw("Error decoding salt", "err", err)
 		return false
 	}
-	newHash := argon2.IDKey([]byte(password), salt, time, memory, threads, KeyLen)
+	newHash := argon2.IDKey([]byte(password), salt, time, memory, threads, keyLen)
 
 	if subtle.ConstantTimeCompare(curHash, newHash) == 1 {
 		return true

@@ -8,11 +8,10 @@ import (
 )
 
 type User struct {
-	ID        uint      `gorm:"column:id;primary_key" json:"id"`
-	UserUUID  string    `gorm:"column:username;not null;<-:create" json:"useruuid"`
-	Password  string    `gorm:"column:password;not null" json:"password"`
-	Nickname  string    `gorm:"column:nickname" json:"nickname"`
-	Email     string    `gorm:"column:email" json:"email"`
+	UserUUID  string    `gorm:"type:char(36);column:userUUID;not null;<-:create;primary_key" json:"useruuid"`
+	Password  string    `gorm:"type:char(32);column:password;not null" json:"-"`
+	Nickname  string    `gorm:"type:varchar(100);column:nickname;collate:utf8mb4_unicode_ci" json:"nickname"`
+	Email     string    `gorm:"type:varchar(255);column:email;unique" json:"email"`
 	CreatedAt time.Time `gorm:"column:created_at" json:"created_at"`
 	UpdatedAt time.Time `gorm:"column:updated_at" json:"updated_at"`
 }
