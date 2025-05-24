@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-type User struct {
+type UserM struct {
 	UserUUID  string    `gorm:"type:char(36);column:userUUID;not null;<-:create;primary_key" json:"useruuid"`
 	Password  string    `gorm:"type:char(32);column:password;not null" json:"-"`
 	Nickname  string    `gorm:"type:varchar(100);column:nickname;collate:utf8mb4_unicode_ci" json:"nickname"`
@@ -16,11 +16,11 @@ type User struct {
 	UpdatedAt time.Time `gorm:"column:updated_at" json:"updated_at"`
 }
 
-func (u *User) TableName() string {
+func (u *UserM) TableName() string {
 	return "users"
 }
 
-func (u *User) BeforeCreate(tx *gorm.DB) error {
+func (u *UserM) BeforeCreate(tx *gorm.DB) error {
 	err := error(nil)
 	u.Password, err = auth.HashPassword(u.Password)
 	if err != nil {
