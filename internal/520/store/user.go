@@ -22,6 +22,12 @@ type userStore struct {
 
 var _ UserStore = (*userStore)(nil)
 
+func newUserStore(db *gorm.DB) *userStore {
+	return &userStore{
+		db: db,
+	}
+}
+
 func (u *userStore) Create(ctx context.Context, user *model.UserM) error {
 	if user == nil {
 		log.Errorw("UserStore is nil")
@@ -49,7 +55,7 @@ func (u *userStore) Delete(ctx context.Context, userUUID string) error {
 
 func (u *userStore) Get(ctx context.Context, userUUID string) (*model.UserM, error) {
 	var user model.UserM
-	err := u.db.First(&user, "user_uuid = ?", userUUID).Error
+	err := u.db.First(&user, "userUUID = ?", userUUID).Error
 	return &user, err
 }
 
