@@ -1,7 +1,5 @@
 package api
 
-import "time"
-
 type LoginRequest struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password"  validate:"required,min=6,max=32"`
@@ -24,10 +22,10 @@ type CreateUserRequest struct {
 type GetUserInfoRequest UserInfo
 
 type UserInfo struct {
-	Email    string    `json:"email"`
-	UserUUID string    `json:"user_uuid"`
-	Nickname string    `json:"nickname"`
-	CreateAt time.Time `json:"create_at"`
+	Email    string `json:"email"`
+	UserUUID string `json:"user_uuid"`
+	Nickname string `json:"nickname"`
+	CreateAt string `json:"create_at"`
 }
 
 type UpdateUserRequest struct {
