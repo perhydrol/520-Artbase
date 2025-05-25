@@ -1,8 +1,8 @@
 package api
 
 type LoginRequest struct {
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password"  validate:"required,min=6,max=32"`
+	Email    string `json:"email" valid:"required,email"`
+	Password string `json:"password"  valid:"required,min=6,max=32"`
 }
 
 type LoginResponse struct {
@@ -10,13 +10,13 @@ type LoginResponse struct {
 }
 
 type ChangePasswordRequest struct {
-	OldPassword string `json:"old_password" validate:"required,min=6,max=32"`
-	NewPassword string `json:"new_password" validate:"required,min=6,max=32"`
+	OldPassword string `json:"old_password" valid:"required,min=6,max=32"`
+	NewPassword string `json:"new_password" valid:"required,min=6,max=32"`
 }
 
 type CreateUserRequest struct {
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,min=6,max=32"`
+	Email    string `json:"email" valid:"required,email"`
+	Password string `json:"password" valid:"required,min=6,max=32"`
 }
 
 type GetUserInfoRequest UserInfo
@@ -29,6 +29,6 @@ type UserInfo struct {
 }
 
 type UpdateUserRequest struct {
-	Email    string `json:"email" validate:"required,email"`
-	Nickname string `json:"nickname" validate:"required,min=6,max=32"`
+	Email    string `json:"email" valid:"required,email"`
+	Nickname string `json:"nickname" valid:"required,min=6,max=32"`
 }
