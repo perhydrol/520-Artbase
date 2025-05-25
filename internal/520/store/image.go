@@ -6,6 +6,7 @@ import (
 	"demo520/internal/pkg/model"
 	"errors"
 	"gorm.io/gorm"
+	"math/rand"
 )
 
 type ImageStore interface {
@@ -14,6 +15,8 @@ type ImageStore interface {
 	Delete(ctx *context.Context, imageUUID string) error
 	AddTagsToImage(ctx *context.Context, imageUUID string, tags []model.ImageTagM) error
 	DeleteTagFromImage(ctx *context.Context, imageUUID string, tag model.ImageTagM) error
+	GetUserImages(ctx *context.Context, UserUUID string, offset, limit int) (int64, []*model.ImageM, error)
+	GetRandomPublicImages(ctx *context.Context, limit int) (int, []*model.ImageM, error)
 }
 
 type imageStore struct {
@@ -72,4 +75,26 @@ func (u *imageStore) DeleteTagFromImage(ctx *context.Context, imageUUID string, 
 		return err
 	}
 	return nil
+}
+
+func (u *imageStore) GetRandomPublicImages(ctx *context.Context, limit int) (retCount int, ret []*model.ImageM, err error) {
+	var allCount int64
+	if err := u.db.Model(&model.ImageM{}).Where("is_public = ?", true).Count(&allCount).Error; err != nil {
+		return 0, nil, err
+	}
+	if allCount == 0 {
+		return 0, nil, nil
+	}
+	retCount = min(int(allCount), limit)
+	offset := rand.Intn(int(allCount) - limit + 1)
+	if offset < 0 {
+		offset = 0
+	}
+	err = u.db.Model(&model.ImageM{}).Where("is_public = ?", true).Offset(offset).Limit(limit).Find(&ret).Error
+	return
+}
+
+func (u *imageStore) GetUserImages(ctx *context.Context, UserUUID string, offset, limit int) (count int64, ret []*model.ImageM, err error) {
+	err = u.db.Model(&model.ImageM{}).Where("userUUID = ?", UserUUID).Offset(offset).Limit(limit).Find(&ret).Count(&count).Error
+	return
 }
