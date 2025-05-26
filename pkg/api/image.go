@@ -8,7 +8,7 @@ type CreateImageRequest struct {
 
 type CreateImageResponse ImageInfo
 
-type GetImageInfoRequest ImageInfo
+type GetImageInfoResponse ImageInfo
 
 type ImageInfo struct {
 	ImageUUID string   `json:"image_uuid"`
@@ -27,4 +27,8 @@ type UpdateImageTagsRequest struct {
 type ListImageResponse struct {
 	Count     int         `json:"count"`
 	ImageList []ImageInfo `json:"image_list"`
+}
+
+type DeleteImageRequest struct {
+	ImageUUID string `json:"image_uuid" valid:"required,uuidv4"`
 }
