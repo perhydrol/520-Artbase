@@ -19,7 +19,7 @@ type CreateUserRequest struct {
 	Password string `json:"password" valid:"required,min=6,max=32"`
 }
 
-type GetUserInfoRequest UserInfo
+type GetUserInfoResponse UserInfo
 
 type UserInfo struct {
 	Email    string `json:"email"`

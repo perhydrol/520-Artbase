@@ -6,6 +6,8 @@ type CreateImageRequest struct {
 	Tags      []string `json:"tags"`
 }
 
+type CreateImageResponse ImageInfo
+
 type GetImageInfoRequest ImageInfo
 
 type ImageInfo struct {
@@ -16,4 +18,13 @@ type ImageInfo struct {
 	Tags      []string `json:"tags"`
 	CreatedAt string   `json:"created_at"`
 	UpdatedAt string   `json:"updated_at"`
+}
+
+type UpdateImageTagsRequest struct {
+	Tags []string `json:"tags"`
+}
+
+type ListImageResponse struct {
+	Count     int         `json:"count"`
+	ImageList []ImageInfo `json:"image_list"`
 }
