@@ -18,7 +18,12 @@ func (ctrl *ImageController) DeleteImage(ctx *gin.Context) {
 		return
 	}
 
-	if err := ctrl.b.Images().Delete(ctx, ctx.Param("imageId")); err != nil {
+	userUUID, ok := ctx.Value("useruuid").(string)
+	if !ok {
+		core.WriteResponse(ctx, errno.ErrUnauthorized, nil)
+		return
+	}
+	if err := ctrl.b.Images().Delete(ctx, userUUID, ctx.Param("imageId")); err != nil {
 		core.WriteResponse(ctx, err, nil)
 		return
 	}

@@ -17,7 +17,12 @@ func (ctrl *ImageController) Get(ctx *gin.Context) {
 		return
 	}
 
-	resp, err := ctrl.b.Images().Get(ctx, imageUUID)
+	userUUID, ok := ctx.Value("useruuid").(string)
+	if !ok {
+		core.WriteResponse(ctx, errno.ErrUnauthorized, nil)
+		return
+	}
+	resp, err := ctrl.b.Images().Get(ctx, userUUID, imageUUID)
 	if err != nil {
 		core.WriteResponse(ctx, err, nil)
 		return

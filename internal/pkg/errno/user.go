@@ -4,6 +4,8 @@ var (
 	// ErrUserAlreadyExist 代表用户已经存在.
 	ErrUserAlreadyExist = &Errno{HTTP: 400, Code: "FailedOperation.UserAlreadyExist", Message: "User already exist."}
 
+	ErrUserLoginRequestOutTime = &Errno{HTTP: 401, Code: "FailedOperation.UserLoginRequestOutTime", Message: "Login request failed."}
+
 	// ErrUserNotFound 表示未找到用户.
 	ErrUserNotFound = &Errno{HTTP: 404, Code: "ResourceNotFound.UserNotFound", Message: "User was not found."}
 

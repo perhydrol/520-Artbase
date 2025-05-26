@@ -23,7 +23,7 @@ func (ctrl *UserController) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	if err := ctrl.b.Users().ChangePassword(c, c.Param("useruuid"), &r); err != nil {
+	if err := ctrl.b.Users().ChangePassword(c, c.Param("email"), &r); err != nil {
 		core.WriteResponse(c, err, nil)
 		return
 	}

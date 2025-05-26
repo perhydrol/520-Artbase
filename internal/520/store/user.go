@@ -12,7 +12,7 @@ type UserStore interface {
 	Create(ctx context.Context, user *model.UserM) error
 	Update(ctx context.Context, user *model.UserM) error
 	Delete(ctx context.Context, userUUID string) error
-	Get(ctx context.Context, userName string) (*model.UserM, error)
+	Get(ctx context.Context, email string) (*model.UserM, error)
 	List(ctx context.Context, offset int, limit int) (*[]model.UserM, error)
 }
 
@@ -53,9 +53,9 @@ func (u *userStore) Delete(ctx context.Context, userUUID string) error {
 	return nil
 }
 
-func (u *userStore) Get(ctx context.Context, userUUID string) (*model.UserM, error) {
+func (u *userStore) Get(ctx context.Context, email string) (*model.UserM, error) {
 	var user model.UserM
-	err := u.db.First(&user, "userUUID = ?", userUUID).Error
+	err := u.db.First(&user, "email = ?", email).Error
 	return &user, err
 }
 

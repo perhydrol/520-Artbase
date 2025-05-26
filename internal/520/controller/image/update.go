@@ -23,7 +23,14 @@ func (ctrl *ImageController) UpdateImageTags(ctx *gin.Context) {
 		core.WriteResponse(ctx, errno.ErrInvalidParameter, nil)
 		return
 	}
-	if err := ctrl.b.Images().UpdateTags(ctx, imageUUID, &req); err != nil {
+
+	userUUID, ok := ctx.Value("useruuid").(string)
+	if !ok {
+		core.WriteResponse(ctx, errno.ErrUnauthorized, nil)
+		return
+	}
+
+	if err := ctrl.b.Images().UpdateTags(ctx, userUUID, imageUUID, &req); err != nil {
 		core.WriteResponse(ctx, err, nil)
 		return
 	}

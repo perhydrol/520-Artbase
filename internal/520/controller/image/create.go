@@ -23,7 +23,12 @@ func (ctrl *ImageController) Create(ctx *gin.Context) {
 		return
 	}
 
-	respo, err := ctrl.b.Images().Create(ctx, &req)
+	userUUID, ok := ctx.Value("useruuid").(string)
+	if !ok {
+		core.WriteResponse(ctx, errno.ErrUnauthorized, nil)
+		return
+	}
+	respo, err := ctrl.b.Images().Create(ctx, userUUID, &req)
 	if err != nil {
 		core.WriteResponse(ctx, err, nil)
 		return

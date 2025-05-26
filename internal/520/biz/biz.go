@@ -26,5 +26,5 @@ func (b *biz) Images() image.ImageBiz {
 }
 
 func (b *biz) Users() user.UserBiz {
-	return nil
+	return user.NewUserBiz(b.db)
 }

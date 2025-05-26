@@ -3,6 +3,7 @@ package api
 type LoginRequest struct {
 	Email    string `json:"email" valid:"required,email"`
 	Password string `json:"password"  valid:"required,min=6,max=32"`
+	SeedTime int64  `json:"seedTime" valid:"required,min=0"`
 }
 
 type LoginResponse struct {
