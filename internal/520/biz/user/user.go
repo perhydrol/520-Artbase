@@ -4,9 +4,13 @@ import (
 	"context"
 	"demo520/internal/520/store"
 	"demo520/internal/pkg/errno"
+	"demo520/internal/pkg/model"
 	"demo520/pkg/api"
 	"demo520/pkg/auth"
 	"demo520/pkg/token"
+	"errors"
+	"gorm.io/gorm"
+	"regexp"
 	"time"
 )
 
@@ -89,18 +93,57 @@ func (u *userBiz) Login(ctx context.Context, r *api.LoginRequest) (*api.LoginRes
 }
 
 func (u *userBiz) Create(ctx context.Context, r *api.CreateUserRequest) error {
-	//TODO implement me
-	panic("implement me")
+	var userM model.UserM
+	userM.Email = r.Email
+	userM.Nickname = r.Nickname
+	userM.Password = r.Password
+
+	if err := u.db.User().Create(ctx, &userM); err != nil {
+		if match, _ := regexp.MatchString("Duplicate entry '.*' for key 'username'", err.Error()); match {
+			return errno.ErrUserAlreadyExist
+		}
+
+		return err
+	}
+	return nil
 }
 
 func (u *userBiz) Get(ctx context.Context, userUUID string) (*api.GetUserInfoResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	user, err := u.db.User().Get(ctx, userUUID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errno.ErrUserNotFound
+		}
+		return nil, err
+	}
+	var resp api.GetUserInfoResponse
+	resp.UserUUID = user.UserUUID
+	resp.Email = user.Email
+	resp.Nickname = user.Nickname
+	resp.CreateAt = user.CreatedAt.Format(time.RFC3339)
+
+	return &resp, nil
 }
 
 func (u *userBiz) Update(ctx context.Context, userUUID string, r *api.UpdateUserRequest) error {
-	//TODO implement me
-	panic("implement me")
+	userM, err := u.db.User().Get(ctx, userUUID)
+	if err != nil {
+		return err
+	}
+
+	if r.Email != "" {
+		userM.Email = r.Email
+	}
+
+	if r.Nickname != "" {
+		userM.Nickname = r.Nickname
+	}
+
+	if err := u.db.User().Update(ctx, userM); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (u *userBiz) Delete(ctx context.Context, userUUID string) error {

@@ -16,6 +16,7 @@ type ChangePasswordRequest struct {
 }
 
 type CreateUserRequest struct {
+	Nickname string `json:"nickname" valid:"required,min=6,max=32"`
 	Email    string `json:"email" valid:"required,email"`
 	Password string `json:"password" valid:"required,min=6,max=32"`
 }

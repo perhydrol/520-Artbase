@@ -1,7 +1,7 @@
 import subprocess
 from pathlib import Path
 
-def export_unstaged_changes(output_file="unstaged.diff"):
+def export_unstaged_changes(output_file="unstaged.txt"):
     """
     将 Git 仓库中所有未暂存的更改导出到指定文件中（兼容 Windows 编码问题）。
     """
