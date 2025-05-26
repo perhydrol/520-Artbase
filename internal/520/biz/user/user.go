@@ -147,6 +147,8 @@ func (u *userBiz) Update(ctx context.Context, userUUID string, r *api.UpdateUser
 }
 
 func (u *userBiz) Delete(ctx context.Context, userUUID string) error {
-	//TODO implement me
-	panic("implement me")
+	if err := u.db.User().Delete(ctx, userUUID); err != nil {
+		return err
+	}
+	return nil
 }
