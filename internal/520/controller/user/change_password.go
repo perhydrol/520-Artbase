@@ -9,10 +9,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (ctrl *UserController) Create(c *gin.Context) {
-	log.C(c).Infow("create user")
+func (ctrl *UserController) ChangePassword(c *gin.Context) {
+	log.C(c).Infow("change password")
 
-	var r api.CreateUserRequest
+	var r api.ChangePasswordRequest
 	if err := c.ShouldBindJSON(&r); err != nil {
 		core.WriteResponse(c, errno.ErrBind, nil)
 		return
@@ -23,7 +23,7 @@ func (ctrl *UserController) Create(c *gin.Context) {
 		return
 	}
 
-	if err := ctrl.b.Users().Create(c, &r); err != nil {
+	if err := ctrl.b.Users().ChangePassword(c, c.Param("useruuid"), &r); err != nil {
 		core.WriteResponse(c, err, nil)
 		return
 	}

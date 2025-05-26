@@ -9,10 +9,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (ctrl *UserController) Create(c *gin.Context) {
-	log.C(c).Infow("create user")
+func (ctrl *UserController) Login(c *gin.Context) {
+	log.C(c).Infow("login")
 
-	var r api.CreateUserRequest
+	var r api.LoginRequest
+
 	if err := c.ShouldBindJSON(&r); err != nil {
 		core.WriteResponse(c, errno.ErrBind, nil)
 		return
@@ -23,9 +24,12 @@ func (ctrl *UserController) Create(c *gin.Context) {
 		return
 	}
 
-	if err := ctrl.b.Users().Create(c, &r); err != nil {
+	resp, err := ctrl.b.Users().Login(c, &r)
+
+	if err != nil {
 		core.WriteResponse(c, err, nil)
 		return
 	}
-	core.WriteResponse(c, nil, nil)
+
+	core.WriteResponse(c, nil, resp)
 }

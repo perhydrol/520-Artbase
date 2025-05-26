@@ -1,6 +1,7 @@
 package core
 
 import (
+	"demo520/internal/pkg/errno"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )
@@ -16,7 +17,9 @@ type ErrResponse struct {
 
 func WriteResponse(c *gin.Context, err error, data interface{}) {
 	if err != nil {
-
+		hcode, code, message := errno.Decode(err)
+		c.JSON(hcode, ErrResponse{Code: code, Message: message})
+		return
 	}
 	c.JSON(http.StatusOK, data)
 }
