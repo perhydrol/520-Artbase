@@ -274,6 +274,33 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Image'
+    delete:
+      tags: [Images]
+      summary: 删除图片（需要登录）
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: image_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        204:
+          description: 图片已成功删除
+        404:
+          description: 图片不存在或无权操作
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "image not found"
+        401:
+          description: 未提供有效凭证
 
   # 收藏功能
   /users/me/favorites:
