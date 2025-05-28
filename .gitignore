@@ -77,7 +77,7 @@ fabric.properties
 # Editor-based Rest Client
 .idea/httpRequests
 
-# Android studio 3.1+ serialized cache path
+# Android studio 3.1+ serialized cache pathDir
 .idea/caches/build_file_checksums.ser
 
 ### GoLand Patch ###
@@ -102,7 +102,7 @@ fabric.properties
 .idea/**/markdown-navigator-enh.xml
 .idea/**/markdown-navigator/
 
-# Cache path creation bug
+# Cache pathDir creation bug
 # See https://youtrack.jetbrains.com/issue/JBR-2257
 .idea/$CACHE_FILE$
 
@@ -161,7 +161,7 @@ fabric.properties
 
 # Editor-based Rest Client
 
-# Android studio 3.1+ serialized cache path
+# Android studio 3.1+ serialized cache pathDir
 
 ### JetBrains+all Patch ###
 # Ignore everything but code style settings and run configurations
