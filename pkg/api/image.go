@@ -11,7 +11,7 @@ type CreateImageResponse ImageInfo
 type GetImageInfoResponse ImageInfo
 
 type ImageInfo struct {
-	ImageUUID string   `json:"image_uuid"`
+	ImageUUID string   `json:"imageuuid"`
 	Token     string   `json:"token"`
 	OwnerUUID string   `json:"owneruuid"`
 	IsPublic  bool     `json:"is_public"`

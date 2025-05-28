@@ -9,6 +9,7 @@ import (
 	"demo520/pkg/auth"
 	"demo520/pkg/token"
 	"errors"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"regexp"
 	"time"
@@ -97,6 +98,7 @@ func (u *userBiz) Create(ctx context.Context, r *api.CreateUserRequest) error {
 	userM.Email = r.Email
 	userM.Nickname = r.Nickname
 	userM.Password = r.Password
+	userM.UserUUID = uuid.New().String()
 
 	if err := u.db.User().Create(ctx, &userM); err != nil {
 		if match, _ := regexp.MatchString("Duplicate entry '.*' for key 'username'", err.Error()); match {
