@@ -8,12 +8,13 @@ import (
 )
 
 type UserM struct {
-	UserUUID  string    `gorm:"type:char(36);column:userUUID;not null;<-:create;primary_key" json:"useruuid"`
-	Password  string    `gorm:"type:char(32);column:password;not null" json:"-"`
-	Nickname  string    `gorm:"type:varchar(100);column:nickname;collate:utf8mb4_unicode_ci" json:"nickname"`
-	Email     string    `gorm:"type:varchar(255);column:email;unique;index" json:"email"`
-	CreatedAt time.Time `gorm:"column:created_at" json:"created_at"`
-	UpdatedAt time.Time `gorm:"column:updated_at" json:"updated_at"`
+	UserUUID  string         `gorm:"type:char(36);column:userUUID;not null;<-:create;primary_key" json:"useruuid"`
+	Password  string         `gorm:"type:char(32);column:password;not null" json:"-"`
+	Nickname  string         `gorm:"type:varchar(100);column:nickname;collate:utf8mb4_unicode_ci" json:"nickname"`
+	Email     string         `gorm:"type:varchar(255);column:email;unique;index" json:"email"`
+	CreatedAt time.Time      `gorm:"column:created_at" json:"created_at"`
+	UpdatedAt time.Time      `gorm:"column:updated_at" json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index"`
 }
 
 func (u *UserM) TableName() string {
