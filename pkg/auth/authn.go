@@ -38,7 +38,7 @@ func HashPassword(password string) (string, error) {
 }
 
 func VerifyPassword(password string, hash string) bool {
-	b64Hash, b64Salt := strings.Split(hash, "$")[0], strings.Split(hash, "$")[1]
+	b64Salt, b64Hash := strings.Split(hash, "$")[0], strings.Split(hash, "$")[1]
 	curHash, err := base64.StdEncoding.DecodeString(b64Hash)
 	if err != nil {
 		log.Errorw("Error decoding hash", "err", err)

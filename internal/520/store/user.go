@@ -5,6 +5,8 @@ import (
 	"demo520/internal/pkg/log"
 	"demo520/internal/pkg/model"
 	"errors"
+	"fmt"
+	"github.com/asaskevich/govalidator"
 	"gorm.io/gorm"
 )
 
@@ -30,36 +32,71 @@ func newUserStore(db *gorm.DB) *userStore {
 
 func (u *userStore) Create(ctx context.Context, user *model.UserM) error {
 	if user == nil {
-		log.Errorw("UserStore is nil")
+		log.Errorw("user cannot be nil")
+		return errors.New("user cannot be nil")
 	}
 	return u.db.Create(user).Error
 }
 
 func (u *userStore) Update(ctx context.Context, user *model.UserM) error {
-	if _, err := u.Get(ctx, user.UserUUID); err != nil {
-		return err
+	if user == nil {
+		log.Errorw("user cannot be nil")
+		return errors.New("user cannot be nil")
 	}
-	return u.db.Save(user).Error
+	if user.UserUUID == "" {
+		log.Errorw("userUUID cannot be empty")
+		return errors.New("userUUID cannot be empty")
+	}
+	if !govalidator.IsUUIDv4(user.UserUUID) {
+		log.Errorw("invalid UUIDv4 format", "userUUID", user.UserUUID)
+		return errors.New("invalid UUIDv4 format")
+	}
+	return u.db.Model(&model.UserM{}).Where("userUUID = ?", user.UserUUID).Omit("userUUID").Updates(user).Error
 }
 
 func (u *userStore) Delete(ctx context.Context, userUUID string) error {
-	if _, err := u.Get(ctx, userUUID); err != nil {
-		return nil
+	if userUUID == "" {
+		log.Errorw("userUUID cannot be empty")
+		return errors.New("userUUID cannot be empty")
 	}
-	err := u.db.Delete(&model.UserM{UserUUID: userUUID}).Error
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
+	if !govalidator.IsUUIDv4(userUUID) {
+		log.Errorw("invalid UUIDv4 format", "userUUID", userUUID)
+		return errors.New("invalid UUIDv4 format")
+	}
+	err := u.db.Model(&model.UserM{}).Where("userUUID = ?", userUUID).Delete(&model.UserM{}).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("user not found with UUID: %s", userUUID)
+		}
+		return fmt.Errorf("database error: %w", err)
 	}
 	return nil
 }
 
 func (u *userStore) Get(ctx context.Context, email string) (*model.UserM, error) {
+	if email == "" {
+		log.Errorw("email cannot be empty")
+		return nil, errors.New("email cannot be empty")
+	}
+	if !govalidator.IsEmail(email) {
+		log.Errorw("invalid email format", "email", email)
+		return nil, errors.New("invalid email format")
+	}
 	var user model.UserM
-	err := u.db.First(&user, "email = ?", email).Error
+	err := u.db.Model(&model.UserM{}).First(&user, "email = ?", email).Error
 	return &user, err
 }
 
 func (u *userStore) List(ctx context.Context, offset int, limit int) (*[]model.UserM, error) {
-	err := u.db.Limit(limit).Offset(offset).Find(&[]model.UserM{}).Error
-	return &[]model.UserM{}, err
+	if offset < 0 {
+		log.Errorw("offset cannot be negative")
+		return nil, errors.New("offset cannot be negative")
+	}
+	if limit <= 0 {
+		log.Errorw("limit must be positive")
+		return nil, errors.New("limit must be positive")
+	}
+	var users []model.UserM
+	err := u.db.Model(&model.UserM{}).Limit(limit).Offset(offset).Find(&users).Error
+	return &users, err
 }
