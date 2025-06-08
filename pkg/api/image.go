@@ -1,9 +1,9 @@
 package api
 
 type CreateImageRequest struct {
-	OwnerUUID string   `json:"owneruuid" valid:"required,uuidv4"`
-	IsPublic  bool     `json:"is_public"  valid:"required"`
-	Tags      []string `json:"tags"`
+	UserUUID string   `json:"owneruuid" valid:"required,uuidv4"`
+	IsPublic bool     `json:"is_public"  valid:"required"`
+	Tags     []string `json:"tags"`
 }
 
 type CreateImageResponse ImageInfo
@@ -13,7 +13,7 @@ type GetImageInfoResponse ImageInfo
 type ImageInfo struct {
 	ImageUUID string   `json:"imageuuid"`
 	Token     string   `json:"token"`
-	OwnerUUID string   `json:"owneruuid"`
+	UserUUID  string   `json:"owneruuid"`
 	IsPublic  bool     `json:"is_public"`
 	Tags      []string `json:"tags"`
 	CreatedAt string   `json:"created_at"`

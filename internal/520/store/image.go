@@ -16,7 +16,7 @@ type ImageStore interface {
 	Get(ctx context.Context, imageUUID string) (*model.ImageM, error)
 	Delete(ctx context.Context, imageUUID string) error
 	AddTagsToImage(ctx context.Context, imageUUID string, tags []string) error
-	DeleteTagFromImage(ctx context.Context, imageUUID string, tag model.ImageTagM) error
+	DeleteTagFromImage(ctx context.Context, imageUUID string, tag []string) error
 	GetUserImages(ctx context.Context, UserUUID string, offset, limit int) (int64, []*model.ImageM, error)
 	GetRandomPublicImages(ctx context.Context, limit int) (int, []*model.ImageM, error)
 }
@@ -39,7 +39,7 @@ func (u *imageStore) Create(ctx context.Context, image *model.ImageM) error {
 
 func (u *imageStore) Get(ctx context.Context, imageUUID string) (*model.ImageM, error) {
 	var image model.ImageM
-	err := u.db.First(&image, "imageUUID = ?", imageUUID).Error
+	err := u.db.Preload("Tags").First(&image, "imageUUID = ?", imageUUID).Error
 	return &image, err
 }
 
@@ -81,7 +81,7 @@ func (u *imageStore) AddTagsToImage(ctx context.Context, imageUUID string, tags 
 				uniqueTags = append(uniqueTags, model.ImageTagM{Tag: tag})
 			}
 		}
-		err := tx.Model(image).Association("tags").Append(uniqueTags)
+		err := tx.Model(&image).Association("Tags").Append(uniqueTags)
 		if err != nil {
 			return err
 		}
@@ -93,12 +93,19 @@ func (u *imageStore) AddTagsToImage(ctx context.Context, imageUUID string, tags 
 	return nil
 }
 
-func (u *imageStore) DeleteTagFromImage(ctx context.Context, imageUUID string, tag model.ImageTagM) error {
-	image, err := u.Get(ctx, imageUUID)
-	if err != nil {
-		return err
-	}
-	err = u.db.Model(image).Association("tags").Delete(tag)
+func (u *imageStore) DeleteTagFromImage(ctx context.Context, imageUUID string, tag []string) error {
+	err := u.db.Transaction(func(tx *gorm.DB) error {
+		var image model.ImageM
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("imageUUID=?", imageUUID).First(&image).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+			}
+		}
+		if err := tx.Where("imageUUID=? AND tag IN ?", imageUUID, tag).Delete(&model.ImageTagM{}).Error; err != nil {
+			return err
+		}
+		return nil
+	})
 	if err != nil {
 		return err
 	}
@@ -113,10 +120,13 @@ func (u *imageStore) GetRandomPublicImages(ctx context.Context, limit int) (retC
 	if allCount == 0 {
 		return 0, nil, nil
 	}
-	retCount = min(int(allCount), limit)
-	offset := rand.Intn(int(allCount) - limit + 1)
-	if offset < 0 {
+	var offset int
+	if allCount <= int64(limit) {
+		retCount = int(allCount)
 		offset = 0
+	} else {
+		retCount = limit
+		offset = rand.Intn(int(allCount) - retCount)
 	}
 	err = u.db.Model(&model.ImageM{}).Where("is_public = ?", true).Offset(offset).Limit(limit).Find(&ret).Error
 	return

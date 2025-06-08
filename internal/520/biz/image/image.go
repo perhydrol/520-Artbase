@@ -8,13 +8,14 @@ import (
 	"demo520/pkg/api"
 	"errors"
 	"fmt"
+	"mime/multipart"
+	"strings"
+
 	"github.com/asaskevich/govalidator"
 	"github.com/google/uuid"
 	"github.com/jinzhu/copier"
 	"github.com/spf13/viper"
 	"gorm.io/gorm"
-	"mime/multipart"
-	"strings"
 )
 
 type ImageBiz interface {
@@ -75,7 +76,7 @@ func (i *imageBiz) Create(ctx context.Context, userUUID string, r *api.CreateIma
 		ImageUUID: imageUUID,
 		Hash:      hash,
 		Token:     "",
-		OwnerUUID: r.OwnerUUID,
+		UserUUID:  r.UserUUID,
 		IsPublic:  r.IsPublic,
 		Tags:      nil,
 	}
@@ -104,7 +105,7 @@ func (i *imageBiz) UpdateTags(ctx context.Context, userUUID string, imageUUID st
 	if getImageErr != nil {
 		return getImageErr
 	}
-	if imageM.OwnerUUID != userUUID {
+	if imageM.UserUUID != userUUID {
 		return fmt.Errorf("%w: unauthorized operation", errno.ErrUnauthorized)
 	}
 	tagSet := make(map[string]struct{})
@@ -135,7 +136,7 @@ func (i *imageBiz) Delete(ctx context.Context, userUUID string, imageUUID string
 	if getImageErr != nil {
 		return getImageErr
 	}
-	if imageM.OwnerUUID != userUUID {
+	if imageM.UserUUID != userUUID {
 		return fmt.Errorf("%w: unauthorized operation", errno.ErrUnauthorized)
 	}
 	delErr := i.db.Image().Delete(ctx, imageUUID)
@@ -164,7 +165,7 @@ func (i *imageBiz) Get(ctx context.Context, userUUID string, imageUUID string) (
 		}
 		return nil, getImageErr
 	}
-	if !imageM.IsPublic && imageM.OwnerUUID != userUUID {
+	if !imageM.IsPublic && imageM.UserUUID != userUUID {
 		return nil, fmt.Errorf("%w: unauthorized operation", errno.ErrUnauthorized)
 	}
 	var ret api.GetImageInfoResponse
@@ -185,7 +186,7 @@ func (i *imageBiz) ListUserOwnImages(ctx context.Context, userUUID string, offse
 	if getImageErr != nil {
 		return nil, getImageErr
 	}
-	if count > 0 && imageList[0].OwnerUUID != userUUID {
+	if count > 0 && imageList[0].UserUUID != userUUID {
 		return nil, fmt.Errorf("%w: unauthorized operation", errno.ErrUnauthorized)
 	}
 	if count == 0 {
