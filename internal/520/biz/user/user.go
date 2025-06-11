@@ -9,17 +9,18 @@ import (
 	"demo520/pkg/auth"
 	"demo520/pkg/token"
 	"errors"
-	"github.com/google/uuid"
-	"gorm.io/gorm"
 	"regexp"
 	"time"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type UserBiz interface {
 	ChangePassword(ctx context.Context, email string, r *api.ChangePasswordRequest) error
 	Login(ctx context.Context, r *api.LoginRequest) (*api.LoginResponse, error)
 	Create(ctx context.Context, r *api.CreateUserRequest) error
-	Get(ctx context.Context, userUUID string) (*api.GetUserInfoResponse, error)
+	Get(ctx context.Context, email string) (*api.GetUserInfoResponse, error)
 	Update(ctx context.Context, userUUID string, r *api.UpdateUserRequest) error
 	Delete(ctx context.Context, userUUID string) error
 }
@@ -110,8 +111,8 @@ func (u *userBiz) Create(ctx context.Context, r *api.CreateUserRequest) error {
 	return nil
 }
 
-func (u *userBiz) Get(ctx context.Context, userUUID string) (*api.GetUserInfoResponse, error) {
-	user, err := u.db.User().Get(ctx, userUUID)
+func (u *userBiz) Get(ctx context.Context, email string) (*api.GetUserInfoResponse, error) {
+	user, err := u.db.User().Get(ctx, email)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errno.ErrUserNotFound
