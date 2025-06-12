@@ -2,12 +2,16 @@ package store
 
 import (
 	"context"
+	"demo520/internal/pkg/errno"
 	"demo520/internal/pkg/log"
 	"demo520/internal/pkg/model"
+	"demo520/pkg/auth"
 	"errors"
 	"fmt"
+
 	"github.com/asaskevich/govalidator"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type UserStore interface {
@@ -16,6 +20,7 @@ type UserStore interface {
 	Delete(ctx context.Context, userUUID string) error
 	Get(ctx context.Context, email string) (*model.UserM, error)
 	List(ctx context.Context, offset int, limit int) (*[]model.UserM, error)
+	ChangePassword(ctx context.Context, email string, oldPassword string, newPassword string) error
 }
 
 type userStore struct {
@@ -52,6 +57,29 @@ func (u *userStore) Update(ctx context.Context, user *model.UserM) error {
 		return errors.New("invalid UUIDv4 format")
 	}
 	return u.db.Model(&model.UserM{}).Where("userUUID = ?", user.UserUUID).Omit("userUUID").Updates(user).Error
+}
+
+func (u *userStore) ChangePassword(ctx context.Context, email string, oldPassword string, newPassword string) error {
+	return u.db.Transaction(func(tx *gorm.DB) error {
+		var user model.UserM
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("email = ?", email).
+			First(&user).Error; err != nil {
+			return err
+		}
+
+		if !auth.VerifyPassword(oldPassword, user.Password) {
+			return errno.ErrPasswordIncorrect
+		}
+		newHash, err := auth.HashPassword(newPassword)
+		if err != nil {
+			return err
+		}
+		if err = tx.Model(&user).Where("email = ?", email).Update("password", newHash).Error; err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 func (u *userStore) Delete(ctx context.Context, userUUID string) error {

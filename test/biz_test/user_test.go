@@ -4,6 +4,7 @@ import (
 	"context"
 	"demo520/internal/520/biz"
 	"demo520/internal/520/store"
+	"demo520/internal/pkg/errno"
 	"demo520/internal/pkg/model"
 	"demo520/pkg/api"
 	"demo520/pkg/token"
@@ -92,11 +93,10 @@ func TestUserBiz_Login_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to setup database: %v", err)
 	}
-	password := faker.Password()
 	userCreateReq := api.CreateUserRequest{
 		Email:    faker.Email(),
 		Nickname: faker.Name(),
-		Password: password,
+		Password: faker.Password(),
 	}
 	_, err = genNewUser(t, db, &userCreateReq)
 	if err != nil {
@@ -108,7 +108,7 @@ func TestUserBiz_Login_Success(t *testing.T) {
 	ctx := context.Background()
 	loginReq := api.LoginRequest{
 		Email:    userCreateReq.Email,
-		Password: password,
+		Password: userCreateReq.Password,
 		SeedTime: time.Now().Unix(),
 	}
 	userInfo, err := userBiz.Get(ctx, userCreateReq.Email)
@@ -118,11 +118,107 @@ func TestUserBiz_Login_Success(t *testing.T) {
 	userUUID := userInfo.UserUUID
 	userResp, err := userBiz.Login(ctx, &loginReq)
 	if err != nil {
-		t.Fatalf("userBiz.Get failed: %v", err)
+		t.Fatalf("userBiz.Login failed: %v", err)
 	}
 	uuidFormToken, err := token.ParseToken(userResp.Token)
 	if err != nil {
 		t.Fatalf("failed to parse token: %v", err)
 	}
 	assert.True(t, uuidFormToken.UserUUID == userUUID)
+}
+
+func TestUserChangePassword_Success(t *testing.T) {
+	db, err := setupDatabase()
+	if err != nil {
+		t.Fatalf("failed to setup database: %v", err)
+	}
+	userCreateReq := api.CreateUserRequest{
+		Email:    faker.Email(),
+		Nickname: faker.Name(),
+		Password: faker.Password(),
+	}
+	_, err = genNewUser(t, db, &userCreateReq)
+	if err != nil {
+		t.Fatalf("failed to create test user: %v", err)
+	}
+	iStore := store.NewStore(db)
+	biz := biz.NewIBiz(iStore)
+	userBiz := biz.Users()
+	ctx := context.Background()
+	changePasswordReq := api.ChangePasswordRequest{
+		OldPassword: userCreateReq.Password,
+		NewPassword: faker.Password(),
+	}
+	if err := userBiz.ChangePassword(ctx, userCreateReq.Email, &changePasswordReq); err != nil {
+		t.Fatalf("failed to change password: %v", err)
+	}
+	userInfo, err := userBiz.Get(ctx, userCreateReq.Email)
+	if err != nil {
+		t.Fatalf("failed to get user info: %v", err)
+	}
+	loginReq := api.LoginRequest{
+		Email:    userCreateReq.Email,
+		Password: userCreateReq.Password,
+		SeedTime: time.Now().Unix(),
+	}
+	userUUID := userInfo.UserUUID
+	_, err = userBiz.Login(ctx, &loginReq)
+	if err != nil {
+		if err != errno.ErrPasswordIncorrect {
+			t.Fatalf("userBiz.Login failed: %v", err)
+		}
+	}
+	loginReq.Password = changePasswordReq.NewPassword
+	userResp, err := userBiz.Login(ctx, &loginReq)
+	if err != nil {
+		t.Fatalf("userBiz.Login failed: %v", err)
+	}
+	uuidFormToken, err := token.ParseToken(userResp.Token)
+	if err != nil {
+		t.Fatalf("failed to parse token: %v", err)
+	}
+	assert.True(t, uuidFormToken.UserUUID == userUUID)
+}
+
+func TestUserBiz_Update_success(t *testing.T) {
+	db, err := setupDatabase()
+	if err != nil {
+		t.Fatalf("failed to setup database: %v", err)
+	}
+	userCreateReq := api.CreateUserRequest{
+		Email:    faker.Email(),
+		Nickname: faker.Name(),
+		Password: faker.Password(),
+	}
+	_, err = genNewUser(t, db, &userCreateReq)
+	if err != nil {
+		t.Fatalf("failed to create test user: %v", err)
+	}
+	iStore := store.NewStore(db)
+	biz := biz.NewIBiz(iStore)
+	userBiz := biz.Users()
+	ctx := context.Background()
+	userInfo, err := userBiz.Get(ctx, userCreateReq.Email)
+	if err != nil {
+		t.Fatalf("failed to get user info: %v", err)
+		return
+	}
+	updateReq := api.UpdateUserRequest{
+		Nickname: faker.Name(),
+		Email:    faker.Email(),
+	}
+	if err := userBiz.Update(ctx, userInfo.UserUUID, userCreateReq.Email, &updateReq); err != nil {
+		t.Fatalf("failed to update user info: %v", err)
+		return
+	}
+	_, err = userBiz.Get(ctx, userCreateReq.Email)
+	if err != nil {
+	}
+	userResp, err := userBiz.Get(ctx, updateReq.Email)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	assert.True(t, userResp.Email == updateReq.Email)
+	assert.True(t, userResp.Nickname == updateReq.Nickname)
 }

@@ -9,9 +9,11 @@ import (
 	"demo520/pkg/auth"
 	"demo520/pkg/token"
 	"errors"
+	"fmt"
 	"regexp"
 	"time"
 
+	"github.com/asaskevich/govalidator"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -21,7 +23,7 @@ type UserBiz interface {
 	Login(ctx context.Context, r *api.LoginRequest) (*api.LoginResponse, error)
 	Create(ctx context.Context, r *api.CreateUserRequest) error
 	Get(ctx context.Context, email string) (*api.GetUserInfoResponse, error)
-	Update(ctx context.Context, userUUID string, r *api.UpdateUserRequest) error
+	Update(ctx context.Context, userUUID, email string, r *api.UpdateUserRequest) error
 	Delete(ctx context.Context, userUUID string) error
 }
 
@@ -38,22 +40,7 @@ func NewUserBiz(db store.IStore) UserBiz {
 }
 
 func (u *userBiz) ChangePassword(ctx context.Context, email string, r *api.ChangePasswordRequest) error {
-	userM, err := u.db.User().Get(ctx, email)
-	if err != nil {
-		return err
-	}
-
-	if !auth.VerifyPassword(r.OldPassword, userM.Password) {
-		return errno.ErrPasswordIncorrect
-	}
-	userM.Password, err = auth.HashPassword(r.NewPassword)
-	if err != nil {
-		return err
-	}
-	if err = u.db.User().Update(ctx, userM); err != nil {
-		return err
-	}
-	return nil
+	return u.db.User().ChangePassword(ctx, email, r.OldPassword, r.NewPassword)
 }
 
 func (u *userBiz) Login(ctx context.Context, r *api.LoginRequest) (*api.LoginResponse, error) {
@@ -128,10 +115,23 @@ func (u *userBiz) Get(ctx context.Context, email string) (*api.GetUserInfoRespon
 	return &resp, nil
 }
 
-func (u *userBiz) Update(ctx context.Context, userUUID string, r *api.UpdateUserRequest) error {
-	userM, err := u.db.User().Get(ctx, userUUID)
+func (u *userBiz) Update(ctx context.Context, userUUID, email string, r *api.UpdateUserRequest) error {
+	if userUUID == "" || email == "" {
+		return fmt.Errorf("missing required parameters: userUUID=%s, email=%s", userUUID, email)
+	}
+	if !govalidator.IsEmail(email) {
+		return fmt.Errorf("invalid email format: %s", email)
+	}
+	if !govalidator.IsUUIDv4(userUUID) {
+		return fmt.Errorf("invalid uuid format: %s", userUUID)
+	}
+	userM, err := u.db.User().Get(ctx, email)
 	if err != nil {
 		return err
+	}
+	if userUUID != userM.UserUUID {
+		return fmt.Errorf("operation not permitted: userUUID mismatch (got %s)",
+			userUUID)
 	}
 
 	if r.Email != "" {

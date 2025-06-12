@@ -5,6 +5,7 @@ import (
 	"demo520/internal/pkg/errno"
 	"demo520/internal/pkg/log"
 	"demo520/pkg/api"
+
 	"github.com/asaskevich/govalidator"
 	"github.com/gin-gonic/gin"
 )
@@ -23,7 +24,7 @@ func (ctrl *UserController) Update(c *gin.Context) {
 		return
 	}
 
-	if err := ctrl.b.Users().Update(c, c.Param("useruuid"), &r); err != nil {
+	if err := ctrl.b.Users().Update(c, c.Param("useruuid"), c.Param("email"), &r); err != nil {
 		core.WriteResponse(c, err, nil)
 		return
 	}
