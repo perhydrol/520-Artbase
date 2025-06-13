@@ -1,4 +1,4 @@
-package store
+package store_test
 
 import (
 	"context"
@@ -6,6 +6,13 @@ import (
 	"demo520/internal/520/store"
 	"demo520/internal/pkg/model"
 	"fmt"
+	"io"
+	"math/rand"
+	"slices"
+	"strings"
+	"sync"
+	"testing"
+
 	"github.com/go-faker/faker/v4"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -13,17 +20,11 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-	"io"
-	"math/rand"
-	"slices"
-	"strings"
-	"sync"
-	"testing"
 )
 
 var userCount = 3
 
-func setupDatabase() (*gorm.DB, []model.UserM, error) {
+func setupImageDatabase() (*gorm.DB, []model.UserM, error) {
 	// 3. 构造 DSN
 	dsn := fmt.Sprintf("root:%s@tcp(127.0.0.1:3306)/testdb?charset=utf8mb4&parseTime=True&loc=Local", "testpassword")
 
@@ -66,7 +67,7 @@ func setupDatabase() (*gorm.DB, []model.UserM, error) {
 }
 
 func TestImageStore(t *testing.T) {
-	db, users, err := setupDatabase()
+	db, users, err := setupImageDatabase()
 	if err != nil {
 		t.Fatal(err)
 	}

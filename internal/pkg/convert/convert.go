@@ -5,12 +5,13 @@ import (
 	"demo520/internal/pkg/helper"
 	"demo520/internal/pkg/log"
 	"errors"
-	"github.com/davidbyttow/govips/v2/vips"
-	"github.com/spf13/viper"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/davidbyttow/govips/v2/vips"
+	"github.com/spf13/viper"
 )
 
 type ImageConverter interface {
@@ -66,7 +67,7 @@ func (i *imageConverter) ConvertImage(filePath string) error {
 		return errors.New("file path is directory")
 	}
 	ext := filepath.Ext(filepath.Base(filePath))
-	filePathWithoutExt := strings.TrimSuffix(filepath.Base(filePath), ext)
+	filePathWithoutExt := strings.TrimSuffix(filePath, ext)
 	image, err := vips.NewImageFromFile(filePath)
 	if err != nil {
 		return err
@@ -98,7 +99,7 @@ func (i *imageConverter) ConvertImage(filePath string) error {
 		log.Errorw("Failed to export avif", "err", err, filePathWithoutExt)
 		return err
 	}
-	avifErr := helper.WriteFile(filePath+".avif", bytes.NewReader(avif))
+	avifErr := helper.WriteFile(filePathWithoutExt+".avif", bytes.NewReader(avif))
 	if avifErr != nil {
 		return avifErr
 	}

@@ -71,14 +71,20 @@ func (i *imageBiz) Create(ctx context.Context, userUUID string, r *api.CreateIma
 	if err := i.imageFileStore.Save(fileHeader, hash); err != nil {
 		return nil, fmt.Errorf("failed to save image file: %w", err)
 	}
-
+	var imageTags []model.ImageTagM
+	for _, tag := range r.Tags {
+		imageTags = append(imageTags, model.ImageTagM{
+			Tag:       tag,
+			ImageUUID: imageUUID,
+		})
+	}
 	imageM := model.ImageM{
 		ImageUUID: imageUUID,
 		Hash:      hash,
 		Token:     "",
 		UserUUID:  r.UserUUID,
 		IsPublic:  r.IsPublic,
-		Tags:      nil,
+		Tags:      imageTags,
 	}
 	if err := i.db.Image().Create(ctx, &imageM); err != nil {
 		return nil, fmt.Errorf("failed to create image record: %w", err)
@@ -87,6 +93,18 @@ func (i *imageBiz) Create(ctx context.Context, userUUID string, r *api.CreateIma
 	var ret api.CreateImageResponse
 	if err := copier.Copy(&ret, imageM); err != nil {
 		return nil, fmt.Errorf("failed to copy image data: %w", err)
+	}
+	if len(imageM.Tags) > 0 {
+		ret.Tags = make([]string, len(imageM.Tags))
+		for i, t := range imageM.Tags {
+			ret.Tags[i] = t.Tag
+		}
+	}
+	if !imageM.CreatedAt.IsZero() {
+		ret.CreatedAt = imageM.CreatedAt.String()
+	}
+	if !imageM.UpdatedAt.IsZero() {
+		ret.UpdatedAt = imageM.UpdatedAt.String()
 	}
 	return &ret, nil
 }

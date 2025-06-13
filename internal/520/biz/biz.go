@@ -22,7 +22,7 @@ func NewIBiz(db store.IStore) IBiz {
 }
 
 func (b *biz) Images() image.ImageBiz {
-	return nil
+	return image.NewImageBiz(b.db)
 }
 
 func (b *biz) Users() user.UserBiz {

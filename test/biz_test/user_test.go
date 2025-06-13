@@ -19,7 +19,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-func setupDatabase() (*gorm.DB, error) {
+func setupUserDatabase() (*gorm.DB, error) {
 	// 3. 构造 DSN
 	dsn := fmt.Sprintf("root:%s@tcp(127.0.0.1:3316)/testdb?charset=utf8mb4&parseTime=True&loc=Local", "testpassword")
 
@@ -65,7 +65,7 @@ func genNewUser(t *testing.T, db *gorm.DB, req *api.CreateUserRequest) (*api.Cre
 }
 
 func TestUserBiz_Create_Success(t *testing.T) {
-	db, err := setupDatabase()
+	db, err := setupUserDatabase()
 	if err != nil {
 		t.Error(err)
 		return
@@ -89,7 +89,7 @@ func TestUserBiz_Create_Success(t *testing.T) {
 }
 
 func TestUserBiz_Login_Success(t *testing.T) {
-	db, err := setupDatabase()
+	db, err := setupUserDatabase()
 	if err != nil {
 		t.Fatalf("failed to setup database: %v", err)
 	}
@@ -128,7 +128,7 @@ func TestUserBiz_Login_Success(t *testing.T) {
 }
 
 func TestUserChangePassword_Success(t *testing.T) {
-	db, err := setupDatabase()
+	db, err := setupUserDatabase()
 	if err != nil {
 		t.Fatalf("failed to setup database: %v", err)
 	}
@@ -181,7 +181,7 @@ func TestUserChangePassword_Success(t *testing.T) {
 }
 
 func TestUserBiz_Update_success(t *testing.T) {
-	db, err := setupDatabase()
+	db, err := setupUserDatabase()
 	if err != nil {
 		t.Fatalf("failed to setup database: %v", err)
 	}
