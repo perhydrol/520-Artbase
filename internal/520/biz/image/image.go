@@ -43,6 +43,25 @@ func NewImageBiz(db store.IStore) ImageBiz {
 	}
 }
 
+func copyImageInfo(info *api.ImageInfo, imageM *model.ImageM) error {
+	if err := copier.Copy(info, imageM); err != nil {
+		return fmt.Errorf("failed to copy image data: %w", err)
+	}
+	if len(imageM.Tags) > 0 {
+		info.Tags = make([]string, len(imageM.Tags))
+		for i, t := range imageM.Tags {
+			info.Tags[i] = t.Tag
+		}
+	}
+	if !imageM.CreatedAt.IsZero() {
+		info.CreatedAt = imageM.CreatedAt.String()
+	}
+	if !imageM.UpdatedAt.IsZero() {
+		info.UpdatedAt = imageM.UpdatedAt.String()
+	}
+	return nil
+}
+
 func (i *imageBiz) Create(ctx context.Context, userUUID string, r *api.CreateImageRequest, fileHeader *multipart.FileHeader) (*api.CreateImageResponse, error) {
 	if fileHeader == nil {
 		return nil, fmt.Errorf("%w: file header", errno.ErrInvalidParameter)
@@ -91,20 +110,8 @@ func (i *imageBiz) Create(ctx context.Context, userUUID string, r *api.CreateIma
 	}
 
 	var ret api.CreateImageResponse
-	if err := copier.Copy(&ret, imageM); err != nil {
+	if err := copyImageInfo((*api.ImageInfo)(&ret), &imageM); err != nil {
 		return nil, fmt.Errorf("failed to copy image data: %w", err)
-	}
-	if len(imageM.Tags) > 0 {
-		ret.Tags = make([]string, len(imageM.Tags))
-		for i, t := range imageM.Tags {
-			ret.Tags[i] = t.Tag
-		}
-	}
-	if !imageM.CreatedAt.IsZero() {
-		ret.CreatedAt = imageM.CreatedAt.String()
-	}
-	if !imageM.UpdatedAt.IsZero() {
-		ret.UpdatedAt = imageM.UpdatedAt.String()
 	}
 	return &ret, nil
 }
@@ -187,7 +194,7 @@ func (i *imageBiz) Get(ctx context.Context, userUUID string, imageUUID string) (
 		return nil, fmt.Errorf("%w: unauthorized operation", errno.ErrUnauthorized)
 	}
 	var ret api.GetImageInfoResponse
-	if err := copier.Copy(&ret, imageM); err != nil {
+	if err := copyImageInfo((*api.ImageInfo)(&ret), imageM); err != nil {
 		return nil, fmt.Errorf("failed to copy image data: %w", err)
 	}
 	return &ret, nil

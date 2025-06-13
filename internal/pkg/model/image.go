@@ -2,15 +2,16 @@ package model
 
 import (
 	"cmp"
-	"gorm.io/gorm"
 	"slices"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type ImageM struct {
 	ImageUUID string      `gorm:"type:char(36);column:imageUUID;primaryKey" json:"imageuuid"`
 	Hash      string      `gorm:"type:char(64);column:hash;index;not null" json:"hash"`
-	Token     string      `gorm:"type:char(36);column:token;uniqueIndex" json:"token"`
+	Token     string      `gorm:"type:char(36);column:token;index" json:"token"`
 	UserUUID  string      `gorm:"type:char(36);column:userUUID;not null" json:"useruuid"`
 	IsPublic  bool        `gorm:"type:boolean;column:is_public;not null" json:"is_public"`
 	Tags      []ImageTagM `gorm:"foreignKey:ImageUUID;references:ImageUUID" json:"tags"`

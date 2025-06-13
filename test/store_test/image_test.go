@@ -26,7 +26,7 @@ var userCount = 3
 
 func setupImageDatabase() (*gorm.DB, []model.UserM, error) {
 	// 3. 构造 DSN
-	dsn := fmt.Sprintf("root:%s@tcp(127.0.0.1:3306)/testdb?charset=utf8mb4&parseTime=True&loc=Local", "testpassword")
+	dsn := fmt.Sprintf("root:%s@tcp(127.0.0.1:3316)/testdb?charset=utf8mb4&parseTime=True&loc=Local", "testpassword")
 
 	// 4. 连接数据库
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{

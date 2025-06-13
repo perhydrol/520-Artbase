@@ -1,4 +1,4 @@
-docker run -d \
+docker run -d --rm \
   --name test-mysql \
   -e MYSQL_ROOT_PASSWORD=testpassword \
   -e MYSQL_DATABASE=testdb \

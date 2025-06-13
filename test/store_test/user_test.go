@@ -6,18 +6,19 @@ import (
 	"demo520/internal/pkg/model"
 	"demo520/pkg/auth"
 	"fmt"
+	"testing"
+
 	"github.com/go-faker/faker/v4"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-	"testing"
 )
 
 func setupDatabase() (*gorm.DB, error) {
 	// 3. 构造 DSN
-	dsn := fmt.Sprintf("root:%s@tcp(127.0.0.1:3306)/testdb?charset=utf8mb4&parseTime=True&loc=Local", "testpassword")
+	dsn := fmt.Sprintf("root:%s@tcp(127.0.0.1:3316)/testdb?charset=utf8mb4&parseTime=True&loc=Local", "testpassword")
 
 	// 4. 连接数据库
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{

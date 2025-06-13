@@ -114,6 +114,26 @@ func cleanTestData() {
 	}
 }
 
+func create_new_image(t *testing.T, db *gorm.DB, userUUID string) *api.CreateImageResponse {
+	imageBiz := getImageBiz(db)
+	ctx := context.Background()
+	if _, err := os.Stat(test_image_path); os.IsNotExist(err) {
+		p, _ := os.Getwd()
+		t.Fatalf("测试资源路径错误，当前工作目录：%v", p)
+	}
+	imageByte, err := os.ReadFile(test_image_path)
+	require.NoError(t, err)
+	fileHeader := makeFileHeader(t, "test_image.png", "image/png", imageByte)
+	createImageReq := api.CreateImageRequest{
+		UserUUID: userUUID,
+		IsPublic: true,
+		Tags:     []string{faker.Word(), faker.Word()},
+	}
+	createImageResp, err := imageBiz.Create(ctx, userUUID, &createImageReq, fileHeader)
+	require.NoError(t, err)
+	return createImageResp
+}
+
 func TestImage_Create_Success(t *testing.T) {
 	setViper()
 	db, _, userUUID, err := setupImageDatabase()
@@ -143,4 +163,64 @@ func TestImage_Create_Success(t *testing.T) {
 	assert.Equal(t, createImageResp.IsPublic, createImageReq.IsPublic)
 	assert.Equal(t, createImageResp.UserUUID, createImageReq.UserUUID)
 	assert.Equal(t, createImageResp.Tags, createImageReq.Tags)
+}
+
+func TestImage_Del_Success(t *testing.T) {
+	setViper()
+	db, _, userUUID, err := setupImageDatabase()
+	require.NoError(t, err)
+	imageInfo := create_new_image(t, db, userUUID)
+	defer cleanTestData()
+	imageBiz := getImageBiz(db)
+	ctx := context.Background()
+	err = imageBiz.Delete(ctx, userUUID, imageInfo.ImageUUID)
+	require.NoError(t, err)
+}
+
+func TestImage_Get_Success(t *testing.T) {
+	setViper()
+	db, _, userUUID, err := setupImageDatabase()
+	require.NoError(t, err)
+	imageBiz := getImageBiz(db)
+	ctx := context.Background()
+	imageInfo := create_new_image(t, db, userUUID)
+	defer cleanTestData()
+	defer imageBiz.Delete(ctx, userUUID, imageInfo.ImageUUID)
+	getInfo, err := imageBiz.Get(ctx, userUUID, imageInfo.ImageUUID)
+	require.NoError(t, err)
+	assert.Equal(t, imageInfo.Tags, getInfo.Tags)
+	assert.Equal(t, imageInfo.Token, getInfo.Token)
+	assert.Equal(t, imageInfo.UserUUID, getInfo.UserUUID)
+	assert.Equal(t, imageInfo.IsPublic, getInfo.IsPublic)
+	assert.Equal(t, imageInfo.ImageUUID, getInfo.ImageUUID)
+	assert.Equal(t, imageInfo.CreatedAt, getInfo.CreatedAt)
+	assert.Equal(t, imageInfo.UpdatedAt, getInfo.UpdatedAt)
+}
+
+func TestImage_UpdateTags(t *testing.T) {
+	setViper()
+	db, _, userUUID, err := setupImageDatabase()
+	require.NoError(t, err)
+	imageBiz := getImageBiz(db)
+	ctx := context.Background()
+	imageInfo := create_new_image(t, db, userUUID)
+	defer cleanTestData()
+	defer imageBiz.Delete(ctx, userUUID, imageInfo.ImageUUID)
+	updataReq := api.UpdateImageTagsRequest{
+		Tags: []string{faker.Word(), faker.Word()},
+	}
+	if err := imageBiz.UpdateTags(ctx, imageInfo.UserUUID, imageInfo.ImageUUID, &updataReq); err != nil {
+		t.Fatalf("failed to updata tags: %v", err)
+	}
+	getInfo, err := imageBiz.Get(ctx, userUUID, imageInfo.ImageUUID)
+	require.NoError(t, err)
+	newTags := make([]string, len(imageInfo.Tags)+len(updataReq.Tags))
+	copy(newTags, imageInfo.Tags)
+	copy(newTags[len(imageInfo.Tags):], updataReq.Tags)
+	assert.Equal(t, getInfo.Tags, newTags)
+	assert.Equal(t, imageInfo.Token, getInfo.Token)
+	assert.Equal(t, imageInfo.UserUUID, getInfo.UserUUID)
+	assert.Equal(t, imageInfo.IsPublic, getInfo.IsPublic)
+	assert.Equal(t, imageInfo.ImageUUID, getInfo.ImageUUID)
+	assert.Equal(t, imageInfo.CreatedAt, getInfo.CreatedAt)
 }
