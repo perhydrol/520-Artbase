@@ -4,6 +4,7 @@ import (
 	"demo520/internal/pkg/core"
 	"demo520/internal/pkg/errno"
 	"demo520/internal/pkg/log"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,13 +17,13 @@ func (ctrl *ImageController) GetUserImagesList(ctx *gin.Context) {
 		return
 	}
 
-	userUUID, ok := ctx.Value("useruuid").(string)
-	if !ok {
-		core.WriteResponse(ctx, errno.ErrUnauthorized, nil)
+	jwtUserUUID, err := pareseJwtAndEqualReqUUID(ctx, nil)
+	if err != nil {
+		core.WriteResponse(ctx, err, nil)
 		return
 	}
 
-	resp, err := ctrl.b.Images().ListUserOwnImages(ctx, userUUID, listRange.Offset, listRange.Limit)
+	resp, err := ctrl.b.Images().ListUserOwnImages(ctx, jwtUserUUID, listRange.Offset, listRange.Limit)
 	if err != nil {
 		core.WriteResponse(ctx, err, nil)
 		return

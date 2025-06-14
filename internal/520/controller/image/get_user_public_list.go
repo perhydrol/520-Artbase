@@ -4,6 +4,7 @@ import (
 	"demo520/internal/pkg/core"
 	"demo520/internal/pkg/errno"
 	"demo520/internal/pkg/log"
+
 	"github.com/asaskevich/govalidator"
 	"github.com/gin-gonic/gin"
 )
@@ -17,6 +18,7 @@ func (ctrl *ImageController) GetUserPublicList(ctx *gin.Context) {
 		return
 	}
 
+	// 获取公开图片，无需认证。直接从参数中解析UUID即可
 	var userUUID string
 	if userUUID = ctx.Param("userUUID"); userUUID == "" || !govalidator.IsUUID(userUUID) {
 		core.WriteResponse(ctx, errno.ErrBind, nil)

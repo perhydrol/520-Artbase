@@ -1,9 +1,17 @@
 package api
 
+type HasUserUUID interface {
+	GetUserUUID() string
+}
+
 type CreateImageRequest struct {
 	UserUUID string   `json:"owneruuid" valid:"required,uuidv4"`
 	IsPublic bool     `json:"is_public"`
 	Tags     []string `json:"tags"`
+}
+
+func (req *CreateImageRequest) GetUserUUID() string {
+	return req.UserUUID
 }
 
 type CreateImageResponse ImageInfo

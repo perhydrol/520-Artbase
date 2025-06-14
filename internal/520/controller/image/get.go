@@ -4,6 +4,7 @@ import (
 	"demo520/internal/pkg/core"
 	"demo520/internal/pkg/errno"
 	"demo520/internal/pkg/log"
+
 	"github.com/asaskevich/govalidator"
 	"github.com/gin-gonic/gin"
 )
@@ -17,12 +18,12 @@ func (ctrl *ImageController) Get(ctx *gin.Context) {
 		return
 	}
 
-	userUUID, ok := ctx.Value("useruuid").(string)
-	if !ok {
-		core.WriteResponse(ctx, errno.ErrUnauthorized, nil)
+	jwtUserUUID, err := pareseJwtAndEqualReqUUID(ctx, nil)
+	if err != nil {
+		core.WriteResponse(ctx, err, nil)
 		return
 	}
-	resp, err := ctrl.b.Images().Get(ctx, userUUID, imageUUID)
+	resp, err := ctrl.b.Images().Get(ctx, jwtUserUUID, imageUUID)
 	if err != nil {
 		core.WriteResponse(ctx, err, nil)
 		return

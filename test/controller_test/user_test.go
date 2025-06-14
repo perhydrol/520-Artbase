@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-faker/faker/v4"
@@ -46,14 +45,6 @@ func genCreateUserReq() *api.CreateUserRequest {
 		Nickname: faker.Name(),
 		Email:    faker.Email(),
 		Password: faker.Password(),
-	}
-}
-
-func genLoginReq(email, password string) *api.LoginRequest {
-	return &api.LoginRequest{
-		Email:    email,
-		Password: password,
-		SeedTime: time.Now().Unix(),
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"demo520/internal/pkg/log"
 	"demo520/pkg/api"
 	"encoding/json"
+
 	"github.com/asaskevich/govalidator"
 	"github.com/gin-gonic/gin"
 )
@@ -34,9 +35,9 @@ func (ctrl *ImageController) Create(ctx *gin.Context) {
 		return
 	}
 
-	userUUID, ok := ctx.Value("useruuid").(string)
-	if !ok {
-		core.WriteResponse(ctx, errno.ErrUnauthorized, nil)
+	jwtUserUUID, err := pareseJwtAndEqualReqUUID(ctx, &req)
+	if err != nil {
+		core.WriteResponse(ctx, err, nil)
 		return
 	}
 
@@ -45,7 +46,7 @@ func (ctrl *ImageController) Create(ctx *gin.Context) {
 		core.WriteResponse(ctx, err, nil)
 		return
 	}
-	respo, err := ctrl.b.Images().Create(ctx, userUUID, &req, file)
+	respo, err := ctrl.b.Images().Create(ctx, jwtUserUUID, &req, file)
 	if err != nil {
 		core.WriteResponse(ctx, err, nil)
 		return
