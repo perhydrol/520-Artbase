@@ -221,9 +221,8 @@ func (i *imageBiz) ListUserOwnImages(ctx context.Context, userUUID string, offse
 	ret.Count = int(count)
 	imageInfos := make([]api.ImageInfo, len(imageList))
 	for i, image := range imageList {
-		copyErr := copier.Copy(&imageInfos[i], image)
-		if copyErr != nil {
-			return nil, copyErr
+		if err := copyImageInfo(&imageInfos[i], image); err != nil {
+			return nil, err
 		}
 	}
 	ret.ImageList = imageInfos
@@ -243,15 +242,16 @@ func (i *imageBiz) ListUserOwnPublicImages(ctx context.Context, userUUID string,
 	}
 	var ret api.ListImageResponse
 	ret.Count = int(count)
-	imageInfos := make([]api.ImageInfo, len(imageList))
-	for i, image := range imageList {
+	imageInfos := make([]api.ImageInfo, 0)
+	for _, image := range imageList {
 		if !image.IsPublic {
 			continue
 		}
-		copyErr := copier.Copy(&imageInfos[i], image)
-		if copyErr != nil {
-			return nil, copyErr
+		var temp_image api.ImageInfo
+		if err := copyImageInfo(&temp_image, image); err != nil {
+			return nil, err
 		}
+		imageInfos = append(imageInfos, temp_image)
 	}
 	ret.ImageList = imageInfos
 	return &ret, nil
@@ -269,9 +269,8 @@ func (i *imageBiz) ListRandomPublicImages(ctx context.Context, limit int) (*api.
 	ret.Count = int(count)
 	imageInfos := make([]api.ImageInfo, len(imageList))
 	for i, image := range imageList {
-		copyErr := copier.Copy(&imageInfos[i], image)
-		if copyErr != nil {
-			return nil, copyErr
+		if err := copyImageInfo(&imageInfos[i], image); err != nil {
+			return nil, err
 		}
 	}
 	ret.ImageList = imageInfos

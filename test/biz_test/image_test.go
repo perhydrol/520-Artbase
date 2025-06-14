@@ -14,7 +14,10 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
+
+	"math/rand"
 
 	"github.com/go-faker/faker/v4"
 	"github.com/spf13/viper"
@@ -26,6 +29,7 @@ import (
 )
 
 var test_image_path = "../test_image.png"
+var test_iamge_list_path = "../test_image"
 
 func setupImageDatabase() (*gorm.DB, *api.CreateUserRequest, string, error) {
 	// 3. 构造 DSN
@@ -134,6 +138,37 @@ func create_new_image(t *testing.T, db *gorm.DB, userUUID string) *api.CreateIma
 	return createImageResp
 }
 
+func create_new_imageList(t *testing.T, db *gorm.DB, userUUID string) []*api.CreateImageResponse {
+	imageBiz := getImageBiz(db)
+	ctx := context.Background()
+	if _, err := os.Stat(test_image_path); os.IsNotExist(err) {
+		p, _ := os.Getwd()
+		t.Fatalf("测试资源路径错误，当前工作目录：%v", p)
+	}
+	entries, err := os.ReadDir(test_iamge_list_path)
+	require.NoError(t, err)
+	imageList := make([]*api.CreateImageResponse, len(entries))
+	wg := sync.WaitGroup{}
+	for i, e := range entries {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			imageByte, err := os.ReadFile(filepath.Join(test_iamge_list_path, e.Name()))
+			require.NoError(t, err)
+			fileHeader := makeFileHeader(t, fmt.Sprintf("test_image_%d.png", i), "image/png", imageByte)
+			createImageReq := api.CreateImageRequest{
+				UserUUID: userUUID,
+				IsPublic: rand.Intn(10)%2 == 0,
+				Tags:     []string{faker.Word(), faker.Word()},
+			}
+			imageList[i], err = imageBiz.Create(ctx, userUUID, &createImageReq, fileHeader)
+			require.NoError(t, err)
+		}()
+	}
+	wg.Wait()
+	return imageList
+}
+
 func TestImage_Create_Success(t *testing.T) {
 	setViper()
 	db, _, userUUID, err := setupImageDatabase()
@@ -223,4 +258,128 @@ func TestImage_UpdateTags(t *testing.T) {
 	assert.Equal(t, imageInfo.IsPublic, getInfo.IsPublic)
 	assert.Equal(t, imageInfo.ImageUUID, getInfo.ImageUUID)
 	assert.Equal(t, imageInfo.CreatedAt, getInfo.CreatedAt)
+}
+
+func TestImage_ListUserOwnImages(t *testing.T) {
+	setViper()
+	defer cleanTestData()
+	db, _, userUUID, err := setupImageDatabase()
+	require.NoError(t, err)
+	imageBiz := getImageBiz(db)
+	ctx := context.Background()
+	imageInfo := create_new_imageList(t, db, userUUID)
+	defer func() {
+		for _, img := range imageInfo {
+			imageBiz.Delete(ctx, userUUID, img.ImageUUID)
+		}
+	}()
+	imageListResp, err := imageBiz.ListUserOwnImages(ctx, userUUID, 0, len(imageInfo))
+	require.NoError(t, err)
+	assert.Equal(t, len(imageListResp.ImageList), len(imageInfo))
+	assert.Equal(t, imageListResp.Count, len(imageInfo))
+	imageMap := make(map[string]*api.ImageInfo, len(imageListResp.ImageList))
+	for _, img := range imageListResp.ImageList {
+		imageMap[img.ImageUUID] = &img
+	}
+	for index := range imageListResp.ImageList {
+		assert.Equal(t, imageInfo[index].Tags, imageMap[imageInfo[index].ImageUUID].Tags)
+		assert.Equal(t, imageInfo[index].Token, imageMap[imageInfo[index].ImageUUID].Token)
+		assert.Equal(t, imageInfo[index].UserUUID, imageMap[imageInfo[index].ImageUUID].UserUUID)
+		assert.Equal(t, imageInfo[index].IsPublic, imageMap[imageInfo[index].ImageUUID].IsPublic)
+		assert.Equal(t, imageInfo[index].ImageUUID, imageMap[imageInfo[index].ImageUUID].ImageUUID)
+		assert.Equal(t, imageInfo[index].CreatedAt, imageMap[imageInfo[index].ImageUUID].CreatedAt)
+		assert.Equal(t, imageInfo[index].UpdatedAt, imageMap[imageInfo[index].ImageUUID].UpdatedAt)
+	}
+
+	if _, err := imageBiz.ListUserOwnImages(ctx, faker.UUIDHyphenated(), 0, 10); err != nil {
+
+	}
+}
+
+func TestImage_ListUserOwnPublicImages(t *testing.T) {
+	setViper()
+	defer cleanTestData()
+	db, _, userUUID, err := setupImageDatabase()
+	require.NoError(t, err)
+	imageBiz := getImageBiz(db)
+	ctx := context.Background()
+	imageInfo := create_new_imageList(t, db, userUUID)
+	defer func() {
+		for _, img := range imageInfo {
+			imageBiz.Delete(ctx, userUUID, img.ImageUUID)
+		}
+	}()
+	public_count := 0
+	for _, img := range imageInfo {
+		if img.IsPublic {
+			public_count++
+		}
+	}
+	imageListResp, err := imageBiz.ListUserOwnPublicImages(ctx, userUUID, 0, len(imageInfo))
+	require.NoError(t, err)
+	assert.Equal(t, public_count, len(imageListResp.ImageList))
+	assert.Equal(t, public_count, len(imageListResp.ImageList))
+	imageMap := make(map[string]*api.ImageInfo, len(imageListResp.ImageList))
+	for _, img := range imageListResp.ImageList {
+		imageMap[img.ImageUUID] = &img
+	}
+	for index := range imageListResp.ImageList {
+		assert.Equal(t, imageInfo[index].Tags, imageMap[imageInfo[index].ImageUUID].Tags)
+		assert.Equal(t, imageInfo[index].Token, imageMap[imageInfo[index].ImageUUID].Token)
+		assert.Equal(t, imageInfo[index].UserUUID, imageMap[imageInfo[index].ImageUUID].UserUUID)
+		assert.Equal(t, imageInfo[index].IsPublic, imageMap[imageInfo[index].ImageUUID].IsPublic)
+		assert.Equal(t, imageInfo[index].ImageUUID, imageMap[imageInfo[index].ImageUUID].ImageUUID)
+		assert.Equal(t, imageInfo[index].CreatedAt, imageMap[imageInfo[index].ImageUUID].CreatedAt)
+		assert.Equal(t, imageInfo[index].UpdatedAt, imageMap[imageInfo[index].ImageUUID].UpdatedAt)
+	}
+
+	if _, err := imageBiz.ListUserOwnPublicImages(ctx, faker.UUIDHyphenated(), 0, 10); err != nil {
+
+	}
+}
+
+func TestImage_ListRandomPublicImages(t *testing.T) {
+	setViper()
+	defer cleanTestData()
+	db, _, userUUID, err := setupImageDatabase()
+	require.NoError(t, err)
+	imageBiz := getImageBiz(db)
+	ctx := context.Background()
+	imageInfo := create_new_imageList(t, db, userUUID)
+	defer func() {
+		for _, img := range imageInfo {
+			imageBiz.Delete(ctx, userUUID, img.ImageUUID)
+		}
+	}()
+	public_count := 0
+	for _, img := range imageInfo {
+		if img.IsPublic {
+			public_count++
+		}
+	}
+	imageListResp, err := imageBiz.ListRandomPublicImages(ctx, len(imageInfo))
+	require.NoError(t, err)
+	assert.Equal(t, public_count, len(imageListResp.ImageList))
+	assert.Equal(t, public_count, len(imageListResp.ImageList))
+	imageMap := make(map[string]*api.ImageInfo, len(imageListResp.ImageList))
+	for _, img := range imageListResp.ImageList {
+		imageMap[img.ImageUUID] = &img
+	}
+	for _, img := range imageInfo {
+		if !img.IsPublic {
+			continue
+		}
+		img_uuid := img.ImageUUID
+		assert.Equal(t, img.Tags, imageMap[img_uuid].Tags)
+		assert.Equal(t, img.Token, imageMap[img_uuid].Token)
+		assert.Equal(t, img.UserUUID, imageMap[img_uuid].UserUUID)
+		assert.Equal(t, img.IsPublic, imageMap[img_uuid].IsPublic)
+		assert.Equal(t, img.ImageUUID, imageMap[img_uuid].ImageUUID)
+		assert.Equal(t, img.CreatedAt, imageMap[img_uuid].CreatedAt)
+		assert.Equal(t, img.UpdatedAt, imageMap[img_uuid].UpdatedAt)
+	}
+
+	if _, err := imageBiz.ListRandomPublicImages(ctx, 10); err != nil {
+
+	}
 }

@@ -196,3 +196,4 @@ fabric.properties
 unstaged.txt
 test/MySqlPassword
 test/biz_test/temp_image
+test/test_image

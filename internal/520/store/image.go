@@ -6,9 +6,10 @@ import (
 	"demo520/internal/pkg/model"
 	"errors"
 	"fmt"
+	"math/rand"
+
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-	"math/rand"
 )
 
 type ImageStore interface {
@@ -128,11 +129,11 @@ func (u *imageStore) GetRandomPublicImages(ctx context.Context, limit int) (retC
 		retCount = limit
 		offset = rand.Intn(int(allCount) - retCount)
 	}
-	err = u.db.Model(&model.ImageM{}).Where("is_public = ?", true).Offset(offset).Limit(limit).Find(&ret).Error
+	err = u.db.Model(&model.ImageM{}).Preload("Tags").Where("is_public = ?", true).Offset(offset).Limit(limit).Find(&ret).Error
 	return
 }
 
 func (u *imageStore) GetUserImages(ctx context.Context, UserUUID string, offset, limit int) (count int64, ret []*model.ImageM, err error) {
-	err = u.db.Model(&model.ImageM{}).Where("userUUID = ?", UserUUID).Offset(offset).Limit(limit).Find(&ret).Count(&count).Error
+	err = u.db.Model(&model.ImageM{}).Preload("Tags").Where("userUUID = ?", UserUUID).Offset(offset).Limit(limit).Find(&ret).Count(&count).Error
 	return
 }
