@@ -2,7 +2,7 @@ package api
 
 type CreateImageRequest struct {
 	UserUUID string   `json:"owneruuid" valid:"required,uuidv4"`
-	IsPublic bool     `json:"is_public"  valid:"required"`
+	IsPublic bool     `json:"is_public"`
 	Tags     []string `json:"tags"`
 }
 
