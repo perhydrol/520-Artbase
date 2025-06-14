@@ -5,6 +5,7 @@ import (
 	"demo520/internal/pkg/errno"
 	"demo520/internal/pkg/log"
 	"demo520/pkg/api"
+	"demo520/pkg/token"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/gin-gonic/gin"
@@ -24,7 +25,12 @@ func (ctrl *UserController) Update(c *gin.Context) {
 		return
 	}
 
-	if err := ctrl.b.Users().Update(c, c.Param("useruuid"), c.Param("email"), &r); err != nil {
+	userUUID, err := token.ParseRequest(c)
+	if err != nil {
+		core.WriteResponse(c, errno.ErrTokenInvalid, nil)
+		return
+	}
+	if err := ctrl.b.Users().Update(c, userUUID, c.Param("email"), &r); err != nil {
 		core.WriteResponse(c, err, nil)
 		return
 	}

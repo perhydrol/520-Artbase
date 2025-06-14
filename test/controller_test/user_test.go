@@ -129,3 +129,83 @@ func TestUser_CreateAndLogin_Success(t *testing.T) {
 	userUUID := token_claims.UserUUID
 	assert.Equal(t, getResp["user_uuid"], userUUID)
 }
+
+func TestUser_CreateAndChangePassword_Success(t *testing.T) {
+	log.Init(nil)
+	db, err := setupUserDatabase()
+	require.NoError(t, err)
+	createUserReq := genCreateUserReq()
+	userController := getUserController(db)
+	c, w := createTestContext("POST", "/users", &createUserReq)
+	userController.Create(c)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	c, w = genGetUserReq(createUserReq.Email)
+	userController.Get(c)
+	assert.Equal(t, http.StatusOK, w.Code)
+	var getResp map[string]string
+	err = json.Unmarshal(w.Body.Bytes(), &getResp)
+	require.NoError(t, err)
+	assert.Equal(t, createUserReq.Email, getResp["email"])
+	assert.Equal(t, createUserReq.Nickname, getResp["nickname"])
+
+	changePassword := api.ChangePasswordRequest{
+		OldPassword: createUserReq.Password,
+		NewPassword: faker.Password(),
+	}
+	c, w = createTestContext("POST", "/change", &changePassword)
+	c.Params = gin.Params{gin.Param{Key: "email", Value: createUserReq.Email}}
+	userController.ChangePassword(c)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	loginReq := genLoginReq(createUserReq.Email, changePassword.NewPassword)
+	c, w = createTestContext("POST", "/login", &loginReq)
+	userController.Login(c)
+	assert.Equal(t, http.StatusOK, w.Code)
+	var loginResp map[string]string
+	err = json.Unmarshal(w.Body.Bytes(), &loginResp)
+	require.NoError(t, err)
+	token_claims, err := token.ParseToken(loginResp["token"])
+	require.NoError(t, err)
+	userUUID := token_claims.UserUUID
+	assert.Equal(t, getResp["user_uuid"], userUUID)
+}
+
+func TestUser_CreateAndUpdate_Success(t *testing.T) {
+	log.Init(nil)
+	db, err := setupUserDatabase()
+	require.NoError(t, err)
+	createUserReq := genCreateUserReq()
+	userController := getUserController(db)
+	c, w := createTestContext("POST", "/users", &createUserReq)
+	userController.Create(c)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	loginReq := genLoginReq(createUserReq.Email, createUserReq.Password)
+	c, w = createTestContext("POST", "/login", &loginReq)
+	userController.Login(c)
+	assert.Equal(t, http.StatusOK, w.Code)
+	var loginResp map[string]string
+	err = json.Unmarshal(w.Body.Bytes(), &loginResp)
+	require.NoError(t, err)
+	userToken := loginResp["token"]
+
+	updateReq := api.UpdateUserRequest{
+		Email:    faker.Email(),
+		Nickname: faker.Name(),
+	}
+	c, w = createTestContext("POST", "/change", &updateReq)
+	appendJWTHeader(c, userToken)
+	c.Params = gin.Params{gin.Param{Key: "email", Value: createUserReq.Email}}
+	userController.Update(c)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	c, w = genGetUserReq(updateReq.Email)
+	userController.Get(c)
+	assert.Equal(t, http.StatusOK, w.Code)
+	var getResp map[string]string
+	err = json.Unmarshal(w.Body.Bytes(), &getResp)
+	require.NoError(t, err)
+	assert.Equal(t, updateReq.Email, getResp["email"])
+	assert.Equal(t, updateReq.Nickname, getResp["nickname"])
+}

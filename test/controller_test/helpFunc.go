@@ -40,3 +40,7 @@ func getUserController(db *gorm.DB) *user.UserController {
 	iStore := store.NewStore(db)
 	return user.NewUserController(iStore)
 }
+
+func appendJWTHeader(c *gin.Context, token string) {
+	c.Request.Header.Set("Authorization", "Bearer "+token)
+}
