@@ -177,10 +177,11 @@ func (i *imageBiz) DeleteCollection(ctx context.Context, userUUID string, imageU
 }
 
 func (i *imageBiz) Get(ctx context.Context, userUUID string, imageUUID string) (*api.GetImageInfoResponse, error) {
+	notAuth := userUUID == ""
 	if !govalidator.IsUUID(imageUUID) {
 		return nil, fmt.Errorf("%w: invalid image UUID", errno.ErrInvalidParameter)
 	}
-	if !govalidator.IsUUID(userUUID) {
+	if !notAuth && !govalidator.IsUUID(userUUID) {
 		return nil, fmt.Errorf("%w: invalid user UUID", errno.ErrInvalidParameter)
 	}
 	imageM, getImageErr := i.db.Image().Get(ctx, imageUUID)
@@ -190,7 +191,7 @@ func (i *imageBiz) Get(ctx context.Context, userUUID string, imageUUID string) (
 		}
 		return nil, getImageErr
 	}
-	if !imageM.IsPublic && imageM.UserUUID != userUUID {
+	if !imageM.IsPublic && (imageM.UserUUID != userUUID || notAuth) {
 		return nil, fmt.Errorf("%w: unauthorized operation", errno.ErrUnauthorized)
 	}
 	var ret api.GetImageInfoResponse

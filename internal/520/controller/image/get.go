@@ -13,15 +13,14 @@ func (ctrl *ImageController) Get(ctx *gin.Context) {
 	log.C(ctx).Infow("Get image")
 	var imageUUID string = ctx.Param("imageuuid")
 
-	if govalidator.IsUUIDv4(imageUUID) == false {
+	if !govalidator.IsUUIDv4(imageUUID) {
 		core.WriteResponse(ctx, errno.ErrInvalidParameter, nil)
 		return
 	}
 
 	jwtUserUUID, err := pareseJwtAndEqualReqUUID(ctx, nil)
 	if err != nil {
-		core.WriteResponse(ctx, err, nil)
-		return
+		jwtUserUUID = ""
 	}
 	resp, err := ctrl.b.Images().Get(ctx, jwtUserUUID, imageUUID)
 	if err != nil {

@@ -17,7 +17,7 @@ func pareseJwtAndEqualReqUUID(ctx *gin.Context, req api.HasUserUUID) (jwtUserUUI
 	if err != nil {
 		return "", errno.ErrTokenInvalid
 	}
-	if jwtUserUUID != reqUserUUID {
+	if req != nil && jwtUserUUID != reqUserUUID {
 		return "", errno.ErrUnauthorized
 	}
 	return
