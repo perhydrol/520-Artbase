@@ -5,351 +5,681 @@ info:
   description: |
     API for image management system with multi-modal model support
 
+    # 安全注意事项
+    所有API请求都必须通过HTTPS发送。所有请求体/响应默认使用JSON格式。
+
 servers:
   - url: https://api.example.com/v1
     description: Production server
 
 components:
+  responses:
+    UnauthorizedError:
+      description: Unauthorized access
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            code: 401
+            message: "Invalid credentials"
+    ForbiddenError:
+      description: Access denied
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            code: 403
+            message: "Access denied"
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            code: 404
+            message: "Resource not found"
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            code: 400
+            message: "Validation failed"
+            detail: "One or more fields contain invalid values"
+            validation_errors:
+              - field: "password"
+                reason: "must be at least 6 characters"
+    TooManyRequestsError:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            code: 429
+            message: "Too many requests"
+
   securitySchemes:
     BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: 使用JWT的Bearer令牌认证
 
   schemas:
-    User:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        email:
-          type: string
-          format: email
-        created_at:
-          type: string
-          format: date-time
-
-    Image:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        owner_id:
-          type: string
-          format: uuid
-        visibility:
-          type: string
-          enum: [private, public]
-        storage_path:
-          type: string
-        description:
-          type: string
-          maxLength: 500
-        created_at:
-          type: string
-          format: date-time
-        metadata:
-          type: object
-          description: For multi-modal model features
-          additionalProperties: true
-
+    # ===== 核心schemas ===== #
     Error:
       type: object
+      required: [code, message]
       properties:
         code:
           type: integer
+          description: HTTP状态码或自定义错误码
+          example: 404
         message:
           type: string
-        details:
+          description: 人类可读的错误摘要
+          example: "Resource not found"
+        detail:
+          type: string
+          description: 可选的详细错误信息
+          example: "Image with ID 550e8400-e29b-41d4-a716-446655440000 not found"
+        validation_errors:
+          type: array
+          description: 字段级验证错误详情
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                example: "password"
+              reason:
+                type: string
+                example: "must be at least 6 characters"
+
+    LoginRequest:
+      type: object
+      required: [email, password, seedTime]
+      properties:
+        email:
+          type: string
+          format: email
+          description: 用户注册时使用的电子邮件地址
+          example: "user@example.com"
+        password:
+          type: string
+          minLength: 6
+          maxLength: 64
+          description: 用户密码
+          example: "securepassword123"
+        seedTime:
+          type: integer
+          format: int64
+          description: 密码生成的时间戳（毫秒）
+          example: 1698765432109
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT访问令牌
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.xxxxx"
+
+    ChangePasswordRequest:
+      type: object
+      required: [old_password, new_password]
+      properties:
+        old_password:
+          type: string
+          minLength: 6
+          maxLength: 64
+          description: 当前密码
+          example: "oldpassword123"
+        new_password:
+          type: string
+          minLength: 6
+          maxLength: 64
+          description: 新密码
+          example: "newpassword456"
+
+    CreateUserRequest:
+      type: object
+      required: [nickname, email, password]
+      properties:
+        nickname:
+          type: string
+          minLength: 6
+          maxLength: 64
+          description: 用户昵称
+          example: "john_doe"
+        email:
+          type: string
+          format: email
+          description: 要注册的电子邮件地址
+          example: "user@example.com"
+        password:
+          type: string
+          minLength: 6
+          maxLength: 64
+          description: 初始密码
+          example: "securepassword123"
+
+    UpdateUserRequest:
+      type: object
+      required: [email, nickname]
+      properties:
+        email:
+          type: string
+          format: email
+          description: 新的电子邮件地址
+          example: "newemail@example.com"
+        nickname:
+          type: string
+          minLength: 6
+          maxLength: 64
+          description: 新的昵称
+          example: "john_doe_new"
+
+    UserInfo:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          description: 用户的电子邮件地址
+          example: "user@example.com"
+        user_uuid:
+          type: string
+          format: uuid
+          description: 用户的唯一标识符
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        nickname:
+          type: string
+          description: 用户的昵称
+          example: "john_doe"
+        create_at:
+          type: string
+          format: date-time
+          description: 用户账户创建时间
+          example: "2023-01-01T00:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: 最后一次更新时间
+          example: "2023-01-02T00:00:00Z"
+
+    CreateImageRequest:
+      type: object
+      required: [owneruuid, is_public]
+      properties:
+        owneruuid:
+          type: string
+          format: uuid
+          description: 图片所有者UUID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        is_public:
+          type: boolean
+          description: 是否公开
+          example: true
+        tags:
           type: array
           items:
             type: string
+          description: 图片标签
+          example: ["nature", "landscape"]
+
+    ImageInfo:
+      type: object
+      properties:
+        imageuuid:
+          type: string
+          format: uuid
+          description: 图像的唯一标识符
+          example: "550e8400-e29b-41d4-a716-446655440001"
+        token:
+          type: string
+          description: 访问图像内容的令牌
+          example: "image_token_12345"
+        owneruuid:
+          type: string
+          format: uuid
+          description: 图像所有者的用户ID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        is_public:
+          type: boolean
+          description: 是否公开
+          example: true
+        tags:
+          type: array
+          items:
+            type: string
+          description: 图像关联的标签
+          example: ["nature", "landscape"]
+        created_at:
+          type: string
+          format: date-time
+          description: 创建时间
+          example: "2023-01-01T00:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: 最后更新时间
+          example: "2023-01-02T00:00:00Z"
+
+    UpdateImageTagsRequest:
+      type: object
+      required: [tags]
+      properties:
+        tags:
+          type: array
+          items:
+            type: string
+          description: 要设置的新标签
+          example: ["nature", "mountains"]
+
+    ListImageResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+          description: 符合条件的图片总数
+          example: 25
+        image_list:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImageInfo"
+
+    DeleteImageRequest:
+      type: object
+      required: [image_uuid]
+      properties:
+        image_uuid:
+          type: string
+          format: uuid
+          description: 要删除的图像的UUID
+          example: "550e8400-e29b-41d4-a716-446655440001"
+
+  parameters:
+    PaginationLimit:
+      name: limit
+      in: query
+      description: 返回的最大项数 (1-100)
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    PaginationOffset:
+      name: offset
+      in: query
+      description: 要跳过的项目数
+      schema:
+        type: integer
+        default: 0
 
 paths:
-  # 用户认证
+  # ===== 用户认证模块修正 ===== #
   /auth/register:
     post:
       tags: [Authentication]
+      summary: 注册新用户
+      description: 创建一个具有指定电子邮件和昵称的新用户
+      operationId: registerUser
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                email:
-                  type: string
-                  format: email
-                password:
-                  type: string
-                  format: password
-                  minLength: 16
+              $ref: "#/components/schemas/CreateUserRequest"
       responses:
         201:
-          description: User created
+          description: User created successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                $ref: "#/components/schemas/UserInfo"
+        400:
+          $ref: "#/components/responses/ValidationError"
+        409:
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                code: 409
+                message: "Email already exists"
+        429:
+          $ref: "#/components/responses/TooManyRequestsError"
 
   /auth/login:
     post:
       tags: [Authentication]
+      summary: 用户登录
+      description: 使用提供的凭据进行身份验证以获取访问令牌
+      operationId: loginUser
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                email:
-                  type: string
-                  format: email
-                password:
-                  type: string
-                  format: password
+              $ref: "#/components/schemas/LoginRequest"
       responses:
         200:
-          description: Login success
+          description: 登录成功
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  token:
-                    type: string
-                  expires_in:
-                    type: integer
+                $ref: "#/components/schemas/LoginResponse"
+        401:
+          $ref: "#/components/responses/UnauthorizedError"
+        429:
+          $ref: "#/components/responses/TooManyRequestsError"
 
-  # 公开图片访问接口
-  /images:
-    get:
-      tags: [Images]
-      summary: 获取公开图片列表（无需登录）
+  # ===== 新增用户管理端点 ===== #
+  /auth/change-password/{email}:
+    post:
+      tags: [Authentication]
+      summary: 修改密码
+      description: 根据指定用户的 email 更改其密码
+      operationId: changePassword
       parameters:
-        - name: page
-          in: query
-          schema:
-            type: integer
-            default: 1
-        - name: page_size
-          in: query
-          schema:
-            type: integer
-            default: 20
-            maximum: 100
-      responses:
-        200:
-          description: Public images list
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Image'
-
-  /images/{image_id}:
-    get:
-      tags: [Images]
-      summary: 获取单个公开图片信息
-      parameters:
-        - name: image_id
+        - name: email
           in: path
           required: true
           schema:
             type: string
-            format: uuid
+            format: email
+          description: 用户邮箱地址
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
       responses:
-        200:
-          description: Image details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Image'
-        404:
-          description: Image not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+        204:
+          description: Password changed successfully
+        400:
+          $ref: "#/components/responses/ValidationError"
+        401:
+          $ref: "#/components/responses/UnauthorizedError"
+        403:
+          $ref: "#/components/responses/ForbiddenError"
+        429:
+          $ref: "#/components/responses/TooManyRequestsError"
 
-  /images/search:
+  /users/{email}:
     get:
-      tags: [Images]
-      summary: 公开图片高级搜索（需要登录）
-      security:
-        - BearerAuth: []
+      tags: [Users]
+      summary: 获取当前用户信息
+      description: 检索有关用户的信息
+      operationId: getCurrentUserInfo
       parameters:
-        - name: q
-          in: query
-          description: 搜索关键词
+        - name: email
+          in: path
+          required: true
           schema:
             type: string
-        - name: page
-          in: query
-          schema:
-            type: integer
-            default: 1
-        - name: page_size
-          in: query
-          schema:
-            type: integer
-            default: 20
-            maximum: 100
+            format: email
+          description: 用户邮箱地址
       responses:
         200:
-          description: Search results
+          description: 用户信息
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  total:
-                    type: integer
-                  items:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Image'
-
-  # 需要认证的图片操作接口
-  /authenticated/images:
-    post:
-      tags: [Images]
-      summary: 上传新图片（需要登录）
+                $ref: "#/components/schemas/UserInfo"
+        401:
+          $ref: "#/components/responses/UnauthorizedError"
+    patch:
+      tags: [Users]
+      summary: 更新用户信息
+      description: 更新当前用户的资料信息
+      operationId: updateCurrentUserInfo
       security:
         - BearerAuth: []
       requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        200:
+          description: 用户信息更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserInfo"
+        400:
+          $ref: "#/components/responses/ValidationError"
+        401:
+          $ref: "#/components/responses/UnauthorizedError"
+        403:
+          $ref: "#/components/responses/ForbiddenError"
+        409:
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                code: 409
+                message: "Email already exists"
+        429:
+          $ref: "#/components/responses/TooManyRequestsError"
+
+  /images:
+    post:
+      tags: [Images]
+      summary: 创建图片及元数据
+      description: 上传一张图片及其关联的 JSON 元数据
+      operationId: createImage
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
         content:
           multipart/form-data:
             schema:
               type: object
               properties:
-                file:
+                image:
                   type: string
                   format: binary
-                visibility:
-                  type: string
-                  enum: [private, public]
-                  default: private
-                description:
-                  type: string
+                json:
+                  $ref: "#/components/schemas/CreateImageRequest"
+              required: [image, json]
       responses:
-        201:
-          description: Image uploaded
+        400:
+          $ref: "#/components/responses/ValidationError"
+        401:
+          $ref: "#/components/responses/UnauthorizedError"
+        403:
+          $ref: "#/components/responses/ForbiddenError"
+        429:
+          $ref: "#/components/responses/TooManyRequestsError"
+
+    get:
+      tags: [Images]
+      summary: 获取随机的公共图片列表
+      description: 获取随机的公共图片列表
+      operationId: listImages
+      parameters:
+        - $ref: "#/components/parameters/PaginationLimit"
+      responses:
+        200:
+          description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Image'
+                $ref: "#/components/schemas/ListImageResponse"
+        429:
+          $ref: "#/components/responses/TooManyRequestsError"
+  /images/{user_uuid}/public:
+    get:
+      tags: [Images]
+      summary: 获取对应用户UUID下的的公共图片列表
+      description: 获取随机的公共图片列表
+      operationId: listImages
+      parameters:
+        - name: user_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 用户UUID
+        - $ref: "#/components/parameters/PaginationLimit"
+        - $ref: "#/components/parameters/PaginationOffset"
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListImageResponse"
+        401:
+          $ref: "#/components/responses/UnauthorizedError"
+        429:
+          $ref: "#/components/responses/TooManyRequestsError"
 
-  /authenticated/images/{image_id}:
+  /images/{user_uuid}/images:
+    get:
+      tags: [Images]
+      summary: 获取对应用户UUID下的的图片列表
+      description: 获取图片列表
+      operationId: listImages
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 用户UUID
+        - $ref: "#/components/parameters/PaginationLimit"
+        - $ref: "#/components/parameters/PaginationOffset"
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListImageResponse"
+        401:
+          $ref: "#/components/responses/UnauthorizedError"
+        429:
+          $ref: "#/components/responses/TooManyRequestsError"
+
+  /images/{image_uuid}:
+    get:
+      tags: [Images]
+      summary: 获取图片详情
+      description: |
+        获取指定图像的详细信息。如果图像为私有，则需要有效的 JWT token。
+        公共图像可匿名访问。
+      operationId: getImageDetails
+      security:
+        - BearerAuth: [] # 表示默认需要 Bearer 认证
+      parameters:
+        - name: image_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 要检索的图像的UUID
+          example: "550e8400-e29b-41d4-a716-446655440001"
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageInfo"
+        401:
+          $ref: "#/components/responses/UnauthorizedError"
+        403:
+          $ref: "#/components/responses/ForbiddenError"
+        404:
+          $ref: "#/components/responses/NotFoundError"
+        429:
+          $ref: "#/components/responses/TooManyRequestsError"
+
     patch:
       tags: [Images]
-      summary: 更新图片属性（需要登录）
+      summary: 更新图片标签
+      description: 更新特定图像的标签集合
+      operationId: updateImageTags
       security:
         - BearerAuth: []
       parameters:
-        - name: image_id
+        - name: image_uuid
           in: path
           required: true
           schema:
             type: string
             format: uuid
+          description: 要更新的图像的UUID
+          example: "550e8400-e29b-41d4-a716-446655440001"
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                visibility:
-                  type: string
-                  enum: [private, public]
-                description:
-                  type: string
+              $ref: "#/components/schemas/UpdateImageTagsRequest"
       responses:
         200:
-          description: Image updated
+          description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Image'
+                $ref: "#/components/schemas/ImageInfo"
+        400:
+          $ref: "#/components/responses/ValidationError"
+        401:
+          $ref: "#/components/responses/UnauthorizedError"
+        403:
+          $ref: "#/components/responses/ForbiddenError"
+        404:
+          $ref: "#/components/responses/NotFoundError"
+        429:
+          $ref: "#/components/responses/TooManyRequestsError"
+
     delete:
       tags: [Images]
-      summary: 删除图片（需要登录）
+      summary: 删除图片
+      description: 永久删除特定图像及其相关数据
+      operationId: deleteImage
       security:
         - BearerAuth: []
       parameters:
-        - name: image_id
+        - name: image_uuid
           in: path
           required: true
           schema:
             type: string
             format: uuid
+          description: 要删除的图像的UUID
+          example: "550e8400-e29b-41d4-a716-446655440001"
       responses:
         204:
-          description: 图片已成功删除
-        404:
-          description: 图片不存在或无权操作
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "image not found"
+          description: No Content
         401:
-          description: 未提供有效凭证
-
-  # 收藏功能
-  /users/me/favorites:
-    get:
-      tags: [Favorites]
-      summary: 获取用户的收藏夹（需要登录）
-      security:
-        - BearerAuth: []
-      responses:
-        200:
-          description: Get user's favorites
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Image'
-
-    post:
-      tags: [Favorites]
-      summary: 添加图片到收藏夹（需要登录）
-      security:
-        - BearerAuth: []
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                image_id:
-                  type: string
-                  format: uuid
-      responses:
-        201:
-          description: Image added to favorites
-
-  /users/me/favorites/{image_id}:
-    delete:
-      tags: [Favorites]
-      summary: 从收藏夹移除图片（需要登录）
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: image_id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        204:
-          description: Favorite removed
+          $ref: "#/components/responses/UnauthorizedError"
+        403:
+          $ref: "#/components/responses/ForbiddenError"
+        404:
+          $ref: "#/components/responses/NotFoundError"
+        429:
+          $ref: "#/components/responses/TooManyRequestsError"
