@@ -7,8 +7,8 @@ var (
 	ErrUserLoginRequestOutTime = &Errno{HTTP: 401, Code: "FailedOperation.UserLoginRequestOutTime", Message: "Login request failed."}
 
 	// ErrUserNotFound 表示未找到用户.
-	ErrUserNotFound = &Errno{HTTP: 404, Code: "ResourceNotFound.UserNotFound", Message: "User was not found."}
+	ErrUserNotFound = &Errno{HTTP: 401, Code: "ResourceNotFound.UserNotFoundOrPasswordIncorrect", Message: "Incorrect username or password"}
 
 	// ErrPasswordIncorrect 表示密码不正确.
-	ErrPasswordIncorrect = &Errno{HTTP: 401, Code: "InvalidParameter.PasswordIncorrect", Message: "Password was incorrect."}
+	ErrPasswordIncorrect = &Errno{HTTP: 401, Code: "ResourceNotFound.UserNotFoundOrPasswordIncorrect", Message: "Incorrect username or password"}
 )

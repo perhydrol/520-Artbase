@@ -3,6 +3,7 @@ package demo520
 import (
 	"demo520/internal/520/store"
 	"demo520/internal/pkg/log"
+	"demo520/internal/pkg/model"
 	"demo520/pkg/db"
 	"os"
 	"path/filepath"
@@ -99,6 +100,18 @@ func initStore() error {
 
 	ins, err := db.NewMySQL(dbOptions)
 	if err != nil {
+		return err
+	}
+	// 自动迁移
+	if err := ins.AutoMigrate(&model.UserM{}); err != nil {
+		return err
+	}
+
+	if err := ins.AutoMigrate(&model.ImageM{}); err != nil {
+		return err
+	}
+
+	if err := ins.AutoMigrate(&model.ImageTagM{}); err != nil {
 		return err
 	}
 
