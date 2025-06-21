@@ -417,6 +417,8 @@ paths:
       summary: 获取当前用户信息
       description: 检索有关用户的信息
       operationId: getCurrentUserInfo
+      security:
+        - BearerAuth: []
       parameters:
         - name: email
           in: path
