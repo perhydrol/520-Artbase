@@ -519,7 +519,7 @@ paths:
                 $ref: "#/components/schemas/ListImageResponse"
         429:
           $ref: "#/components/responses/TooManyRequestsError"
-  /images/{user_uuid}/public:
+  /images/user/{user_uuid}/public:
     get:
       tags: [Images]
       summary: 获取对应用户UUID下的的公共图片列表
@@ -547,7 +547,7 @@ paths:
         429:
           $ref: "#/components/responses/TooManyRequestsError"
 
-  /images/{user_uuid}/images:
+  /images/user/{user_uuid}/images:
     get:
       tags: [Images]
       summary: 获取对应用户UUID下的的图片列表

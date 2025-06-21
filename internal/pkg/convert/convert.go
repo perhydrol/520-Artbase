@@ -41,11 +41,11 @@ func InitImageConverter() ImageConverter {
 	once.Do(func() {
 		converter = imageConverter{}
 		c = config{
-			WebPQuality:        viper.GetInt("WebPQuality"),
-			WebReductionEffort: viper.GetInt("WebReductionEffort"),
-			AvifQuality:        viper.GetInt("AvifQuality"),
-			AvifEffort:         viper.GetInt("AvifEffort"),
-			Lossless:           viper.GetBool("ImageLossless"),
+			WebPQuality:        viper.GetInt("image.Convert.WebPQuality"),
+			WebReductionEffort: viper.GetInt("image.Convert.WebReductionEffort"),
+			AvifQuality:        viper.GetInt("image.Convert.AvifQuality"),
+			AvifEffort:         viper.GetInt("image.Convert.AvifEffort"),
+			Lossless:           viper.GetBool("image.Convert.ImageLossless"),
 		}
 		vips.Startup(nil)
 	})

@@ -13,11 +13,11 @@ import (
 )
 
 const (
-	// recommendedHomeDir 定义放置 miniblog 服务配置的默认目录.
-	recommendedHomeDir = ".miniblog"
+	// recommendedHomeDir 定义放置 demo520 服务配置的默认目录.
+	recommendedHomeDir = ".demo520"
 
-	// defaultConfigName 指定了 miniblog 服务的默认配置文件名.
-	defaultConfigName = "miniblog.yaml"
+	// defaultConfigName 指定了 demo520 服务的默认配置文件名.
+	defaultConfigName = "demo520.yaml"
 )
 
 // initConfig 设置需要读取的配置文件名、环境变量，并读取配置文件内容到 viper 中.
@@ -43,6 +43,8 @@ func initConfig() {
 		// 配置文件名称（没有文件扩展名）
 		viper.SetConfigName(defaultConfigName)
 	}
+	viper.SetDefault("image.ImageMaxSize", int64(20*1024*1024)) // 10 MB
+	viper.SetDefault("image.image_dir", "temp_image")
 
 	// 读取匹配的环境变量
 	viper.AutomaticEnv()
@@ -65,16 +67,24 @@ func initConfig() {
 
 // logOptions 从 viper 中读取日志配置，构建 `*log.Options` 并返回.
 // 注意：`viper.Get<Type>()` 中 key 的名字需要使用 `.` 分割，以跟 YAML 中保持相同的缩进.
-func logOptions() *log.LogConfig {
+func LogOptions() *log.LogConfig {
+	// 关键字段设置默认值
+	viper.SetDefault("log.disable-caller", false)
+	viper.SetDefault("log.disable-stacktrace", false)
+	viper.SetDefault("log.level", "info")
+	viper.SetDefault("log.encoding", "console")
+	viper.SetDefault("log.output-paths", []string{"stdout"})
+
 	return &log.LogConfig{
 		DisableCaller:     viper.GetBool("log.disable-caller"),
 		DisableStacktrace: viper.GetBool("log.disable-stacktrace"),
 		Level:             viper.GetString("log.level"),
+		Encoding:          viper.GetString("log.encoding"),
 		OutputPaths:       viper.GetStringSlice("log.output-paths"),
 	}
 }
 
-// initStore 读取 db 配置，创建 gorm.DB 实例，并初始化 miniblog store 层.
+// initStore 读取 db 配置，创建 gorm.DB 实例，并初始化 demo520 store 层.
 func initStore() error {
 	dbOptions := &db.MySQLOptions{
 		Host:                  viper.GetString("db.host"),

@@ -42,8 +42,8 @@ func installRouters(g *gin.Engine) error {
 	{
 		imageg.POST("", imagec.Create)
 		imageg.GET("", imagec.GetPublicList)
-		imageg.GET(":user_uuid/public", imagec.GetUserPublicList)
-		imageg.GET(":user_uuid/images", imagec.GetUserImagesList)
+		imageg.GET("/user/:user_uuid/public", imagec.GetUserPublicList)
+		imageg.GET("/user/:user_uuid/images", imagec.GetUserImagesList)
 		imageg.GET(":iamge_uuid", imagec.Get)
 		imageg.PATCH(":image_uuid", imagec.UpdateImageTags)
 	}

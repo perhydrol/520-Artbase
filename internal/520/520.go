@@ -20,7 +20,7 @@ import (
 
 var cfgFile string
 
-func NewMiniBlogCommand() *cobra.Command {
+func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		// 指定命令的名字，该名字会出现在帮助信息中
 		Use: "520-Artbase",
@@ -33,10 +33,6 @@ func NewMiniBlogCommand() *cobra.Command {
 		SilenceUsage: true,
 		// 指定调用 cmd.Execute() 时，执行的 Run 函数，函数执行失败会返回错误信息
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// 初始化日志
-			log.Init(logOptions())
-			defer log.Sync() // Sync 将缓存中的日志刷新到磁盘文件中
-
 			return run()
 		},
 		// 这里设置命令运行时，不需要指定命令行参数
@@ -57,7 +53,7 @@ func NewMiniBlogCommand() *cobra.Command {
 	// 在这里您将定义标志和配置设置。
 
 	// Cobra 支持持久性标志(PersistentFlag)，该标志可用于它所分配的命令以及该命令下的每个子命令
-	cmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "The path to the miniblog configuration file. Empty string for no configuration file.")
+	cmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "The path to the demo520 configuration file. Empty string for no configuration file.")
 
 	// Cobra 也支持本地标志，本地标志只能在其所绑定的命令上使用
 	cmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
@@ -92,9 +88,6 @@ func run() error {
 	// 创建并运行 HTTP 服务器
 	httpsrv := startInsecureServer(g)
 
-	// 创建并运行 HTTPS 服务器
-	httpssrv := startSecureServer(g)
-
 	// 等待中断信号优雅地关闭服务器（10 秒超时)。
 	quit := make(chan os.Signal, 1)
 	// kill 默认会发送 syscall.SIGTERM 信号
@@ -113,10 +106,6 @@ func run() error {
 		log.Errorw("Insecure Server forced to shutdown", "err", err)
 		return err
 	}
-	if err := httpssrv.Shutdown(ctx); err != nil {
-		log.Errorw("Secure Server forced to shutdown", "err", err)
-		return err
-	}
 
 	log.Infow("Server exiting")
 
@@ -126,11 +115,11 @@ func run() error {
 // startInsecureServer 创建并运行 HTTP 服务器.
 func startInsecureServer(g *gin.Engine) *http.Server {
 	// 创建 HTTP Server 实例
-	httpsrv := &http.Server{Addr: viper.GetString("addr"), Handler: g}
+	httpsrv := &http.Server{Addr: viper.GetString("server.addr"), Handler: g}
 
 	// 运行 HTTP 服务器。在 goroutine 中启动服务器，它不会阻止下面的正常关闭处理流程
 	// 打印一条日志，用来提示 HTTP 服务已经起来，方便排障
-	log.Infow("Start to listening the incoming requests on http address", "addr", viper.GetString("addr"))
+	log.Infow("Start to listening the incoming requests on http address", "addr", viper.GetString("server.addr"))
 	go func() {
 		if err := httpsrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalw(err.Error())
@@ -138,24 +127,4 @@ func startInsecureServer(g *gin.Engine) *http.Server {
 	}()
 
 	return httpsrv
-}
-
-// startSecureServer 创建并运行 HTTPS 服务器.
-func startSecureServer(g *gin.Engine) *http.Server {
-	// 创建 HTTPS Server 实例
-	httpssrv := &http.Server{Addr: viper.GetString("tls.addr"), Handler: g}
-
-	// 运行 HTTPS 服务器。在 goroutine 中启动服务器，它不会阻止下面的正常关闭处理流程
-	// 打印一条日志，用来提示 HTTPS 服务已经起来，方便排障
-	log.Infow("Start to listening the incoming requests on https address", "addr", viper.GetString("tls.addr"))
-	cert, key := viper.GetString("tls.cert"), viper.GetString("tls.key")
-	if cert != "" && key != "" {
-		go func() {
-			if err := httpssrv.ListenAndServeTLS(cert, key); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				log.Fatalw(err.Error())
-			}
-		}()
-	}
-
-	return httpssrv
 }
