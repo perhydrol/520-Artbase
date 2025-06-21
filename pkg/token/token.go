@@ -3,11 +3,12 @@ package token
 import (
 	"demo520/internal/pkg/log"
 	"errors"
-	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 var ErrMissingHeader = errors.New("the length of the `Authorization` header is zero")
@@ -82,5 +83,9 @@ func ParseRequest(c *gin.Context) (string, error) {
 	t := strings.TrimPrefix(header, "Bearer ")
 
 	claims, err := ParseToken(t)
-	return claims.UserUUID, err
+	if err != nil {
+		return "", err
+	} else {
+		return claims.UserUUID, nil
+	}
 }

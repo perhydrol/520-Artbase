@@ -1,6 +1,7 @@
 package image
 
 import (
+	"demo520/internal/520/controller"
 	"demo520/internal/pkg/core"
 	"demo520/internal/pkg/errno"
 	"demo520/internal/pkg/log"
@@ -17,9 +18,9 @@ func (ctrl *ImageController) GetUserImagesList(ctx *gin.Context) {
 		return
 	}
 
-	jwtUserUUID, err := pareseJwtAndEqualReqUUID(ctx, nil)
-	if err != nil {
-		core.WriteResponse(ctx, err, nil)
+	jwtUserUUID, ok := controller.GetUserUUIDFromContext(ctx)
+	if !ok {
+		core.WriteResponse(ctx, errno.ErrTokenInvalid, nil)
 		return
 	}
 
