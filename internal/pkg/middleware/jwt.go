@@ -3,6 +3,7 @@ package middleware
 import (
 	"demo520/internal/pkg/core"
 	"demo520/pkg/token"
+	"errors"
 
 	"github.com/gin-gonic/gin"
 )
@@ -13,9 +14,14 @@ func JWTAuth() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		jwtUserUUID, err := token.ParseRequest(ctx)
 		if err != nil {
-			core.WriteResponse(ctx, err, nil)
-			ctx.Abort()
-			return
+			if errors.Is(err, token.ErrMissingHeader) {
+				ctx.Set(CtxJWTUserUUID, "")
+				ctx.Next()
+			} else {
+				core.WriteResponse(ctx, err, nil)
+				ctx.Abort()
+				return
+			}
 		}
 		ctx.Set(CtxJWTUserUUID, jwtUserUUID)
 		ctx.Next()
