@@ -2,8 +2,9 @@ package core
 
 import (
 	"demo520/internal/pkg/errno"
-	"github.com/gin-gonic/gin"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 // ErrResponse 定义了发生错误时的返回消息.
@@ -22,4 +23,13 @@ func WriteResponse(c *gin.Context, err error, data interface{}) {
 		return
 	}
 	c.JSON(http.StatusOK, data)
+}
+
+func ResponseFile(c *gin.Context, err error, filePath string) {
+	if err != nil {
+		hcode, code, message := errno.Decode(err)
+		c.JSON(hcode, ErrResponse{Code: code, Message: message})
+		return
+	}
+	c.File(filePath)
 }

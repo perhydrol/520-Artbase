@@ -54,6 +54,7 @@ func installRouters(g *gin.Engine) error {
 			privateImages.GET("/:image_uuid", imagec.Get)
 			privateImages.GET("/user/:user_uuid/images", imagec.GetUserImagesList)
 			privateImages.PATCH("/:image_uuid", imagec.UpdateImageTags)
+			privateImages.GET("/file/:imageUUIDFileName", imagec.GetImageFile)
 		}
 	}
 	return nil

@@ -3,16 +3,18 @@ package image
 import (
 	"crypto/sha256"
 	"demo520/internal/pkg/convert"
+	"demo520/internal/pkg/errno"
 	"demo520/internal/pkg/helper"
 	"demo520/internal/pkg/log"
 	"fmt"
-	"github.com/gabriel-vasile/mimetype"
-	"github.com/spf13/viper"
 	"io"
 	"mime/multipart"
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/gabriel-vasile/mimetype"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -26,6 +28,7 @@ type ImageFileStore interface {
 	IsContainerImage(hash string) (bool, error)
 	Remove(fileHeader *multipart.FileHeader) error
 	Hash(fileHeader *multipart.FileHeader) (string, error)
+	GetFilePath(hash, ext string) (filePath string, err error)
 }
 
 type imageFileStore struct {
@@ -147,4 +150,18 @@ func (i *imageFileStore) Hash(fileHeader *multipart.FileHeader) (string, error) 
 	}
 
 	return fmt.Sprintf("%x", hasher.Sum(nil)), nil
+}
+
+func (i *imageFileStore) GetFilePath(hash, ext string) (filePath string, err error) {
+	if ok, err := i.IsContainerImage(hash); !ok || err != nil {
+		return "", fmt.Errorf("%w: image %s not found", errno.ErrImageNotFound)
+	}
+	pathDir, err := genPathDir(hash)
+	if err != nil {
+		return "", fmt.Errorf("generate pathDir failed: %w", err)
+	}
+	fullDirPath := filepath.Join(i.baseDir, pathDir)
+	fileName := fmt.Sprintf("%s%s", hash, ext)
+	filePath = filepath.Join(fullDirPath, fileName)
+	return filePath, nil
 }

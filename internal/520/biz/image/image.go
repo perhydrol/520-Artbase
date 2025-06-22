@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"mime/multipart"
+	"path/filepath"
 	"strings"
 
 	"github.com/asaskevich/govalidator"
@@ -27,6 +28,7 @@ type ImageBiz interface {
 	ListUserOwnImages(ctx context.Context, userUUID string, offset, limit int) (*api.ListImageResponse, error)
 	ListUserOwnPublicImages(ctx context.Context, userUUID string, offset, limit int) (*api.ListImageResponse, error)
 	ListRandomPublicImages(ctx context.Context, limit int) (*api.ListImageResponse, error)
+	GetImageFile(ctx context.Context, userUUID string, imageUUIDFileName string) (filePath string, err error)
 }
 
 type imageBiz struct {
@@ -177,11 +179,11 @@ func (i *imageBiz) DeleteCollection(ctx context.Context, userUUID string, imageU
 }
 
 func (i *imageBiz) Get(ctx context.Context, userUUID string, imageUUID string) (*api.GetImageInfoResponse, error) {
-	notAuth := userUUID == ""
+	isAnonymous := userUUID == ""
 	if !govalidator.IsUUID(imageUUID) {
 		return nil, fmt.Errorf("%w: invalid image UUID", errno.ErrInvalidParameter)
 	}
-	if !notAuth && !govalidator.IsUUID(userUUID) {
+	if !isAnonymous && !govalidator.IsUUID(userUUID) {
 		return nil, fmt.Errorf("%w: invalid user UUID", errno.ErrInvalidParameter)
 	}
 	imageM, getImageErr := i.db.Image().Get(ctx, imageUUID)
@@ -189,10 +191,15 @@ func (i *imageBiz) Get(ctx context.Context, userUUID string, imageUUID string) (
 		if errors.Is(getImageErr, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("%w: image=%s", errno.ErrImageNotFound, imageUUID)
 		}
-		return nil, getImageErr
+		return nil, fmt.Errorf("db error: %w", getImageErr)
 	}
-	if !imageM.IsPublic && (imageM.UserUUID != userUUID || notAuth) {
-		return nil, fmt.Errorf("%w: unauthorized operation", errno.ErrUnauthorized)
+	if !imageM.IsPublic {
+		if isAnonymous {
+			return nil, fmt.Errorf("%w: authentication required", errno.ErrUnauthorized)
+		}
+		if imageM.UserUUID != userUUID {
+			return nil, fmt.Errorf("%w: access denied for image %s", errno.ErrUnauthorized, imageUUID)
+		}
 	}
 	var ret api.GetImageInfoResponse
 	if err := copyImageInfo((*api.ImageInfo)(&ret), imageM); err != nil {
@@ -276,4 +283,50 @@ func (i *imageBiz) ListRandomPublicImages(ctx context.Context, limit int) (*api.
 	}
 	ret.ImageList = imageInfos
 	return &ret, nil
+}
+
+func (i *imageBiz) GetImageFile(ctx context.Context, userUUID string, imageUUIDFileName string) (filePath string, err error) {
+	isAnonymous := userUUID == ""
+
+	ext := filepath.Ext(imageUUIDFileName)
+	imageUUID := strings.TrimSuffix(imageUUIDFileName, ext)
+	if ext == "" || len(ext) >= len(imageUUIDFileName) {
+		return "", fmt.Errorf("%w: missing or invalid file extension", errno.ErrImageFileInvalid)
+	}
+	if !govalidator.IsUUID(imageUUID) {
+		return "", fmt.Errorf("%w: invalid image UUID", errno.ErrInvalidParameter)
+	}
+
+	switch ext {
+	case ".png", ".webp", ".avif":
+		// ok
+	default:
+		return "", fmt.Errorf("%w: unsupported image format %s", errno.ErrImageFileInvalid, ext)
+	}
+
+	if !isAnonymous && !govalidator.IsUUID(userUUID) {
+		return "", fmt.Errorf("%w: invalid user UUID", errno.ErrInvalidParameter)
+	}
+	imageM, getImageErr := i.db.Image().Get(ctx, imageUUID)
+	if getImageErr != nil {
+		if errors.Is(getImageErr, gorm.ErrRecordNotFound) {
+			return "", fmt.Errorf("%w: image %s not found", errno.ErrImageNotFound, imageUUID)
+		}
+		return "", fmt.Errorf("db error: %w", getImageErr)
+	}
+
+	if !imageM.IsPublic {
+		if userUUID == "" {
+			return "", fmt.Errorf("%w: authentication required", errno.ErrUnauthorized)
+		}
+		if imageM.UserUUID != userUUID {
+			return "", fmt.Errorf("%w: access denied for image %s", errno.ErrUnauthorized, imageUUID)
+		}
+	}
+
+	filePath, err = i.imageFileStore.GetFilePath(imageM.Hash, ext)
+	if err != nil {
+		return "", fmt.Errorf("failed to find file: %w", err)
+	}
+	return filePath, nil
 }
