@@ -28,20 +28,22 @@ func installRouters(g *gin.Engine) error {
 	uc := user.NewUserController(store.S)
 	imagec := image.NewUserController(store.S)
 
-	auth := g.Group("/auth")
+	api_v1 := g.Group("/api")
+
+	auth := api_v1.Group("/auth")
 	{
 		auth.POST("/register", uc.Create)
 		auth.POST("/login", uc.Login)
 		auth.POST("/change-password/:email", uc.ChangePassword)
 	}
 
-	users := g.Group("/users").Use(middleware.JWTAuth())
+	users := api_v1.Group("/users").Use(middleware.JWTAuth())
 	{
 		users.GET("/:email", uc.Get)
 		users.PATCH("/:email", uc.Update)
 	}
 
-	images := g.Group("/images")
+	images := api_v1.Group("/images")
 	{
 		// 公开接口
 		images.GET("", imagec.GetPublicList)

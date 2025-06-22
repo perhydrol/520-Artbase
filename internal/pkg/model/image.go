@@ -5,6 +5,7 @@ import (
 	"slices"
 	"time"
 
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -15,6 +16,18 @@ type ImageM struct {
 	UserUUID  string      `gorm:"type:char(36);column:userUUID;not null" json:"useruuid"`
 	IsPublic  bool        `gorm:"type:boolean;column:is_public;not null" json:"is_public"`
 	Tags      []ImageTagM `gorm:"foreignKey:ImageUUID;references:ImageUUID" json:"tags"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt gorm.DeletedAt `gorm:"index"`
+}
+
+type NewImageM struct {
+	ImageUUID datatypes.BinUUID `gorm:"type:binary(16);column:imageUUID;primaryKey" json:"imageuuid"`
+	Hash      []byte            `gorm:"type:binary(32);column:hash;index;not null" json:"hash"`
+	Token     []byte            `gorm:"type:binary(32);column:token;index" json:"token"`
+	UserUUID  datatypes.BinUUID `gorm:"type:binary(16);column:userUUID;not null" json:"useruuid"`
+	IsPublic  bool              `gorm:"type:boolean;column:is_public;not null" json:"is_public"`
+	Tags      []ImageTagM       `gorm:"foreignKey:ImageUUID;references:ImageUUID" json:"tags"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt gorm.DeletedAt `gorm:"index"`
