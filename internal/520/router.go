@@ -28,7 +28,7 @@ func installRouters(g *gin.Engine) error {
 	uc := user.NewUserController(store.S)
 	imagec := image.NewUserController(store.S)
 
-	api_v1 := g.Group("/api")
+	api_v1 := g.Group("/v1")
 
 	auth := api_v1.Group("/auth")
 	{

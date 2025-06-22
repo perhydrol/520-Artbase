@@ -496,6 +496,12 @@ paths:
                   $ref: "#/components/schemas/CreateImageRequest"
               required: [image, json]
       responses:
+        201:
+          description: 图片创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageInfo"
         400:
           $ref: "#/components/responses/ValidationError"
         401:
@@ -613,43 +619,6 @@ paths:
           $ref: "#/components/responses/NotFoundError"
         429:
           $ref: "#/components/responses/TooManyRequestsError"
-  /images/file/{imageUUIDFileName}:
-    get:
-      tags:
-        - Images
-      summary: 下载图片文件
-      description: |
-        下载指定图像的原始文件。参数中应包含 UUID 和扩展名（例如 550e8400-e29b-41d4-a716-446655440001.png）。
-        公共图像可匿名访问；私有图像需带 Bearer JWT。
-      operationId: downloadImageFile
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: imageUUIDFileName
-          in: path
-          required: true
-          schema:
-            type: string
-            pattern: '^[0-9a-fA-F\-]{36}\.(png|webp|avif)$'
-          description: 图像文件名，必须为 36 位 UUID + '.' + 扩展名 (.png/.webp/.avif)
-          example: "550e8400-e29b-41d4-a716-446655440001.webp"
-      responses:
-        "200":
-          description: 成功返回图像二进制文件
-          content:
-            application/octet-stream:
-              schema:
-                type: string
-                format: binary
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "403":
-          $ref: "#/components/responses/ForbiddenError"
-        "404":
-          $ref: "#/components/responses/NotFoundError"
-        "429":
-          $ref: "#/components/responses/TooManyRequestsError"
-
     patch:
       tags: [Images]
       summary: 更新图片标签
@@ -688,6 +657,42 @@ paths:
         404:
           $ref: "#/components/responses/NotFoundError"
         429:
+          $ref: "#/components/responses/TooManyRequestsError"
+  /images/file/{imageUUIDFileName}:
+    get:
+      tags:
+        - Images
+      summary: 下载图片文件
+      description: |
+        下载指定图像的原始文件。参数中应包含 UUID 和扩展名（例如 550e8400-e29b-41d4-a716-446655440001.png）。
+        公共图像可匿名访问；私有图像需带 Bearer JWT。
+      operationId: downloadImageFile
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: imageUUIDFileName
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9a-fA-F\-]{36}\.(png|webp|avif)$'
+          description: 图像文件名，必须为 36 位 UUID + '.' + 扩展名 (.png/.webp/.avif)
+          example: "550e8400-e29b-41d4-a716-446655440001.webp"
+      responses:
+        "200":
+          description: 成功返回图像二进制文件
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "429":
           $ref: "#/components/responses/TooManyRequestsError"
 
     delete:

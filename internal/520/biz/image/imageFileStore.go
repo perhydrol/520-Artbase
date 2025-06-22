@@ -40,7 +40,7 @@ var _ ImageFileStore = (*imageFileStore)(nil)
 
 func NewImageFileStore() ImageFileStore {
 	imageFileStoreOnce.Do(func() {
-		this = &imageFileStore{baseDir: viper.GetString("image_dir"), imageConverter: convert.InitImageConverter()}
+		this = &imageFileStore{baseDir: viper.GetString("iamge.image_dir"), imageConverter: convert.InitImageConverter()}
 	})
 	return this
 }

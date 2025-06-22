@@ -12,7 +12,7 @@ import (
 
 func (ctrl *ImageController) Get(ctx *gin.Context) {
 	log.C(ctx).Infow("Get image")
-	var imageUUID string = ctx.Param("imageuuid")
+	var imageUUID string = ctx.Param("image_uuid")
 
 	if !govalidator.IsUUIDv4(imageUUID) {
 		core.WriteResponse(ctx, errno.ErrInvalidParameter, nil)

@@ -14,7 +14,7 @@ func (ctrl *ImageController) UpdateImageTags(ctx *gin.Context) {
 	log.C(ctx).Infow("UpdateImageTags")
 	var req api.UpdateImageTagsRequest
 
-	imageUUID := ctx.Param("imageUUID")
+	imageUUID := ctx.Param("image_uuid")
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		core.WriteResponse(ctx, errno.ErrBind, nil)
 		return

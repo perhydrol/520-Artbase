@@ -72,7 +72,7 @@ func (i *imageBiz) Create(ctx context.Context, userUUID string, r *api.CreateIma
 		return nil, fmt.Errorf("%w: request", errno.ErrInvalidParameter)
 	}
 
-	imageMaxSize := viper.GetInt64("ImageMaxSize")
+	imageMaxSize := viper.GetInt64("image.ImageMaxSize")
 	if fileHeader.Size > imageMaxSize {
 		return nil, errno.ErrImageFileTooLarge
 	}

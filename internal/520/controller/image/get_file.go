@@ -14,7 +14,7 @@ import (
 
 func (ctrl *ImageController) GetImageFile(ctx *gin.Context) {
 	log.C(ctx).Infow("Get image file")
-	var imageUUIDFileName string = ctx.Param("imageuuidFile")
+	var imageUUIDFileName string = ctx.Param("imageUUIDFileName")
 
 	ext := filepath.Ext(imageUUIDFileName)
 	imageUUID := strings.TrimSuffix(imageUUIDFileName, ext)
