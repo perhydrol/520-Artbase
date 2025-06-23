@@ -3,6 +3,11 @@ package log
 import (
 	"context"
 	"demo520/internal/pkg/known"
+	"fmt"
+	"reflect"
+	"runtime"
+	"strings"
+	"time"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"sync"
@@ -16,6 +21,10 @@ type Logger interface {
 	Panicw(msg string, keysAndValues ...interface{})
 	Fatalw(msg string, keysAndValues ...interface{})
 	Sync()
+	// 新增函数入口跟踪方法
+	FuncEntry(args ...interface{}) func()
+	FuncEntryWithContext(ctx context.Context, args ...interface{}) func()
+	ErrorWithFunc(err error, msg string, keysAndValues ...interface{})
 }
 
 type zapLogger struct {
@@ -152,4 +161,133 @@ func (l *zapLogger) C(ctx context.Context) *zapLogger {
 func (l *zapLogger) clone() *zapLogger {
 	lc := *l
 	return &lc
+}
+
+// getFuncName 获取调用函数的名称
+func getFuncName(skip int) string {
+	pc, _, _, ok := runtime.Caller(skip)
+	if !ok {
+		return "unknown"
+	}
+	funcName := runtime.FuncForPC(pc).Name()
+	// 提取函数名（去掉包路径）
+	if lastSlash := strings.LastIndex(funcName, "/"); lastSlash >= 0 {
+		funcName = funcName[lastSlash+1:]
+	}
+	if lastDot := strings.LastIndex(funcName, "."); lastDot >= 0 {
+		funcName = funcName[lastDot+1:]
+	}
+	return funcName
+}
+
+// formatArgs 格式化函数参数
+func formatArgs(args ...interface{}) []interface{} {
+	if len(args) == 0 {
+		return []interface{}{"args", "none"}
+	}
+	
+	var formattedArgs []interface{}
+	for i, arg := range args {
+		key := fmt.Sprintf("arg%d", i)
+		value := formatArgValue(arg)
+		formattedArgs = append(formattedArgs, key, value)
+	}
+	return formattedArgs
+}
+
+// formatArgValue 格式化单个参数值
+func formatArgValue(arg interface{}) interface{} {
+	if arg == nil {
+		return "<nil>"
+	}
+	
+	v := reflect.ValueOf(arg)
+	switch v.Kind() {
+	case reflect.String:
+		return fmt.Sprintf("\"%s\"", v.String())
+	case reflect.Ptr:
+		if v.IsNil() {
+			return "<nil>"
+		}
+		return fmt.Sprintf("&%v", formatArgValue(v.Elem().Interface()))
+	case reflect.Slice, reflect.Array:
+		if v.Len() > 5 {
+			return fmt.Sprintf("[%d items]", v.Len())
+		}
+		return fmt.Sprintf("%v", arg)
+	case reflect.Map:
+		if v.Len() > 5 {
+			return fmt.Sprintf("map[%d items]", v.Len())
+		}
+		return fmt.Sprintf("%v", arg)
+	case reflect.Struct:
+		return fmt.Sprintf("%T{...}", arg)
+	default:
+		return arg
+	}
+}
+
+// FuncEntry 记录函数入口信息，返回一个用于记录函数退出的函数
+func FuncEntry(args ...interface{}) func() {
+	return logger.FuncEntry(args...)
+}
+
+func (l *zapLogger) FuncEntry(args ...interface{}) func() {
+	funcName := getFuncName(3) // skip: FuncEntry -> logger.FuncEntry -> actual caller
+	startTime := time.Now()
+	
+	// 记录函数入口
+	logArgs := []interface{}{"function", funcName, "action", "entry"}
+	logArgs = append(logArgs, formatArgs(args...)...)
+	l.z.Sugar().Debugw("Function entry", logArgs...)
+	
+	// 返回用于记录函数退出的函数
+	return func() {
+		duration := time.Since(startTime)
+		l.z.Sugar().Debugw("Function exit", 
+			"function", funcName, 
+			"action", "exit", 
+			"duration", duration.String())
+	}
+}
+
+// FuncEntryWithContext 带上下文的函数入口记录
+func FuncEntryWithContext(ctx context.Context, args ...interface{}) func() {
+	return logger.FuncEntryWithContext(ctx, args...)
+}
+
+func (l *zapLogger) FuncEntryWithContext(ctx context.Context, args ...interface{}) func() {
+	funcName := getFuncName(3)
+	startTime := time.Now()
+	
+	// 使用带上下文的日志记录器
+	ctxLogger := l.C(ctx)
+	
+	// 记录函数入口
+	logArgs := []interface{}{"function", funcName, "action", "entry"}
+	logArgs = append(logArgs, formatArgs(args...)...)
+	ctxLogger.z.Sugar().Debugw("Function entry", logArgs...)
+	
+	// 返回用于记录函数退出的函数
+	return func() {
+		duration := time.Since(startTime)
+		ctxLogger.z.Sugar().Debugw("Function exit", 
+			"function", funcName, 
+			"action", "exit", 
+			"duration", duration.String())
+	}
+}
+
+// ErrorWithFunc 记录错误信息并包含函数名
+func ErrorWithFunc(err error, msg string, keysAndValues ...interface{}) {
+	logger.ErrorWithFunc(err, msg, keysAndValues...)
+}
+
+func (l *zapLogger) ErrorWithFunc(err error, msg string, keysAndValues ...interface{}) {
+	funcName := getFuncName(3)
+	
+	logArgs := []interface{}{"function", funcName, "error", err.Error()}
+	logArgs = append(logArgs, keysAndValues...)
+	
+	l.z.Sugar().Errorw(msg, logArgs...)
 }

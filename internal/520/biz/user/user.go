@@ -4,6 +4,7 @@ import (
 	"context"
 	"demo520/internal/520/store"
 	"demo520/internal/pkg/errno"
+	"demo520/internal/pkg/log"
 	"demo520/internal/pkg/model"
 	"demo520/pkg/api"
 	"demo520/pkg/auth"
@@ -39,20 +40,29 @@ func NewUserBiz(db store.IStore) UserBiz {
 }
 
 func (u *userBiz) ChangePassword(ctx context.Context, email string, r *api.ChangePasswordRequest) error {
+	defer log.FuncEntryWithContext(ctx, email, "***")()
+
 	if err := u.db.User().ChangePassword(ctx, email, r.OldPassword, r.NewPassword); err != nil {
 		// ChangePassword方法内部已经处理了密码错误的情况，这里只处理其他错误
 		if errors.Is(err, errno.ErrPasswordIncorrect) {
+			log.ErrorWithFunc(err, "旧密码验证失败", "email", email)
 			return err
 		}
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errno.ErrUserNotFound
+			err := errno.ErrUserNotFound
+			log.ErrorWithFunc(err, "用户不存在", "email", email)
+			return err
 		}
+		log.ErrorWithFunc(err, "修改密码失败", "email", email)
 		return errno.InternalServerError.SetMessage("failed to change password: %v", err)
 	}
+	log.Infow("密码修改成功", "email", email)
 	return nil
 }
 
 func (u *userBiz) Login(ctx context.Context, r *api.LoginRequest) (*api.LoginResponse, error) {
+	defer log.FuncEntryWithContext(ctx, r.Email, "***", r.SeedTime)()
+
 	var t time.Time
 
 	// 自动检测时间戳单位（秒或毫秒）
@@ -71,11 +81,17 @@ func (u *userBiz) Login(ctx context.Context, r *api.LoginRequest) (*api.LoginRes
 	utcTime := t.UTC()
 	duration := now.Sub(utcTime)
 	if duration < 0 || duration >= 5*time.Minute {
-		return nil, errno.ErrUserLoginRequestOutTime
+		err := errno.ErrUserLoginRequestOutTime
+		log.ErrorWithFunc(err, "登录请求时间超时",
+			"email", r.Email,
+			"seedTime", r.SeedTime,
+			"duration", duration.String())
+		return nil, err
 	}
 
 	userM, err := u.db.User().Get(ctx, r.Email)
 	if err != nil {
+		log.ErrorWithFunc(err, "获取用户信息失败", "email", r.Email)
 		return nil, errno.ErrUserNotFound
 	}
 
@@ -91,6 +107,8 @@ func (u *userBiz) Login(ctx context.Context, r *api.LoginRequest) (*api.LoginRes
 }
 
 func (u *userBiz) Create(ctx context.Context, r *api.CreateUserRequest) error {
+	defer log.FuncEntryWithContext(ctx, r.Email, "***")()
+
 	var userM model.UserM
 	userM.Email = r.Email
 	userM.Nickname = r.Nickname
@@ -107,8 +125,11 @@ func (u *userBiz) Create(ctx context.Context, r *api.CreateUserRequest) error {
 }
 
 func (u *userBiz) Get(ctx context.Context, email string) (*api.GetUserInfoResponse, error) {
+	defer log.FuncEntryWithContext(ctx, email)()
+
 	user, err := u.db.User().Get(ctx, email)
 	if err != nil {
+		log.ErrorWithFunc(err, "获取用户信息失败", "email", email)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errno.ErrUserNotFound
 		}

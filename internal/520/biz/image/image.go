@@ -5,6 +5,7 @@ import (
 	"demo520/internal/520/store"
 	"demo520/internal/pkg/config"
 	"demo520/internal/pkg/errno"
+	"demo520/internal/pkg/log"
 	"demo520/internal/pkg/model"
 	"demo520/pkg/api"
 	"errors"
@@ -66,38 +67,55 @@ func copyImageInfo(info *api.ImageInfo, imageM *model.NewImageM) error {
 }
 
 func (i *imageBiz) Create(ctx context.Context, userUUID string, r *api.CreateImageRequest, fileHeader *multipart.FileHeader) (*api.CreateImageResponse, error) {
+	defer log.FuncEntryWithContext(ctx, userUUID, r, fileHeader)()
+	
 	// 参数验证
 	if fileHeader == nil {
-		return nil, errno.ErrInvalidParameter.SetMessage("file header is required")
+		err := errno.ErrInvalidParameter.SetMessage("file header is required")
+		log.ErrorWithFunc(err, "参数验证失败", "parameter", "fileHeader")
+		return nil, err
 	}
 	if r == nil {
-		return nil, errno.ErrInvalidParameter.SetMessage("request is required")
+		err := errno.ErrInvalidParameter.SetMessage("request is required")
+		log.ErrorWithFunc(err, "参数验证失败", "parameter", "request")
+		return nil, err
 	}
 
 	// 文件大小验证
 	imageMaxSize := config.GetImage().ImageMaxSize
 	if fileHeader.Size > imageMaxSize {
-		return nil, errno.ErrImageFileTooLarge
+		err := errno.ErrImageFileTooLarge
+		log.ErrorWithFunc(err, "文件大小超限", 
+			"fileSize", fileHeader.Size, 
+			"maxSize", imageMaxSize)
+		return nil, err
 	}
 
 	// 文件格式验证
 	if ok, err := i.imageFileStore.Validate(fileHeader); err != nil {
+		log.ErrorWithFunc(err, "文件格式验证失败")
 		return nil, errno.InternalServerError.SetMessage("failed to validate image: %v", err)
 	} else if !ok {
-		return nil, errno.ErrImageFileInvalid
+		err := errno.ErrImageFileInvalid
+		log.ErrorWithFunc(err, "文件格式无效")
+		return nil, err
 	}
 
 	// 计算文件哈希
 	hash, err := i.imageFileStore.Hash(fileHeader)
 	if err != nil {
+		log.ErrorWithFunc(err, "计算文件哈希失败")
 		return nil, errno.InternalServerError.SetMessage("failed to calculate image hash: %v", err)
 	}
+	log.Infow("文件哈希计算成功", "hash", hash)
 
 	// 保存文件
 	imageUUID := uuid.New()
 	if err := i.imageFileStore.Save(fileHeader, hash); err != nil {
+		log.ErrorWithFunc(err, "保存文件失败", "imageUUID", imageUUID.String())
 		return nil, errno.InternalServerError.SetMessage("failed to save image file: %v", err)
 	}
+	log.Infow("文件保存成功", "imageUUID", imageUUID.String(), "hash", hash)
 
 	// 处理标签
 	var imageTags []model.ImageTagM
@@ -136,9 +154,12 @@ func (i *imageBiz) Create(ctx context.Context, userUUID string, r *api.CreateIma
 }
 
 func (i *imageBiz) UpdateTags(ctx context.Context, userUUID string, imageUUID string, r *api.UpdateImageTagsRequest) error {
+	defer log.FuncEntryWithContext(ctx, userUUID, imageUUID, r)()
 	// 参数验证
 	if !govalidator.IsUUID(imageUUID) {
-		return errno.ErrInvalidParameter.SetMessage("invalid image UUID")
+		err := errno.ErrInvalidParameter.SetMessage("invalid image UUID")
+		log.ErrorWithFunc(err, "参数验证失败", "imageUUID", imageUUID)
+		return err
 	}
 	if !govalidator.IsUUID(userUUID) {
 		return errno.ErrInvalidParameter.SetMessage("invalid user UUID")
@@ -151,14 +172,21 @@ func (i *imageBiz) UpdateTags(ctx context.Context, userUUID string, imageUUID st
 	imageM, err := i.db.Image().Get(ctx, imageUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errno.ErrImageNotFound.SetMessage("image %s not found", imageUUID)
+			err := errno.ErrImageNotFound.SetMessage("image %s not found", imageUUID)
+			log.ErrorWithFunc(err, "图片不存在", "imageUUID", imageUUID)
+			return err
 		}
+		log.ErrorWithFunc(err, "获取图片信息失败", "imageUUID", imageUUID)
 		return errno.InternalServerError.SetMessage("failed to get image: %v", err)
 	}
 
 	// 权限验证
 	if imageM.UserUUID.String() != userUUID {
-		return errno.ErrUnauthorized.SetMessage("access denied for image %s", imageUUID)
+		err := errno.ErrUnauthorized.SetMessage("access denied for image %s", imageUUID)
+		log.ErrorWithFunc(err, "用户无权限操作该图片", 
+			"requestUserUUID", userUUID, 
+			"imageOwnerUUID", imageM.UserUUID.String())
+		return err
 	}
 
 	// 标签去重处理
@@ -180,6 +208,7 @@ func (i *imageBiz) UpdateTags(ctx context.Context, userUUID string, imageUUID st
 }
 
 func (i *imageBiz) Delete(ctx context.Context, userUUID string, imageUUID string) error {
+	defer log.FuncEntryWithContext(ctx, userUUID, imageUUID)()
 	// 参数验证
 	if !govalidator.IsUUID(imageUUID) {
 		return errno.ErrInvalidParameter.SetMessage("invalid image UUID")
@@ -215,6 +244,7 @@ func (i *imageBiz) DeleteCollection(ctx context.Context, userUUID string, imageU
 }
 
 func (i *imageBiz) Get(ctx context.Context, userUUID string, imageUUID string) (*api.GetImageInfoResponse, error) {
+	defer log.FuncEntryWithContext(ctx, userUUID, imageUUID)()
 	isAnonymous := userUUID == ""
 
 	// 参数验证
