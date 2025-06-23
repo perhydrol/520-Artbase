@@ -107,7 +107,7 @@ func initStore() error {
 		return err
 	}
 
-	if err := ins.AutoMigrate(&model.ImageM{}); err != nil {
+	if err := ins.AutoMigrate(&model.NewImageM{}); err != nil {
 		return err
 	}
 

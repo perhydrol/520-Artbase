@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jinzhu/copier"
 	"github.com/spf13/viper"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -45,7 +46,7 @@ func NewImageBiz(db store.IStore) ImageBiz {
 	}
 }
 
-func copyImageInfo(info *api.ImageInfo, imageM *model.ImageM) error {
+func copyImageInfo(info *api.ImageInfo, imageM *model.NewImageM) error {
 	if err := copier.Copy(info, imageM); err != nil {
 		return fmt.Errorf("failed to copy image data: %w", err)
 	}
@@ -65,76 +66,102 @@ func copyImageInfo(info *api.ImageInfo, imageM *model.ImageM) error {
 }
 
 func (i *imageBiz) Create(ctx context.Context, userUUID string, r *api.CreateImageRequest, fileHeader *multipart.FileHeader) (*api.CreateImageResponse, error) {
+	// 参数验证
 	if fileHeader == nil {
-		return nil, fmt.Errorf("%w: file header", errno.ErrInvalidParameter)
+		return nil, errno.ErrInvalidParameter.SetMessage("file header is required")
 	}
 	if r == nil {
-		return nil, fmt.Errorf("%w: request", errno.ErrInvalidParameter)
+		return nil, errno.ErrInvalidParameter.SetMessage("request is required")
 	}
 
+	// 文件大小验证
 	imageMaxSize := viper.GetInt64("image.ImageMaxSize")
 	if fileHeader.Size > imageMaxSize {
 		return nil, errno.ErrImageFileTooLarge
 	}
 
+	// 文件格式验证
 	if ok, err := i.imageFileStore.Validate(fileHeader); err != nil {
-		return nil, fmt.Errorf("failed to validate image: %w", err)
+		return nil, errno.InternalServerError.SetMessage("failed to validate image: %v", err)
 	} else if !ok {
 		return nil, errno.ErrImageFileInvalid
 	}
 
+	// 计算文件哈希
 	hash, err := i.imageFileStore.Hash(fileHeader)
 	if err != nil {
-		return nil, fmt.Errorf("failed to calculate image hash: %w", err)
+		return nil, errno.InternalServerError.SetMessage("failed to calculate image hash: %v", err)
 	}
 
-	imageUUID := uuid.New().String()
+	// 保存文件
+	imageUUID := uuid.New()
 	if err := i.imageFileStore.Save(fileHeader, hash); err != nil {
-		return nil, fmt.Errorf("failed to save image file: %w", err)
+		return nil, errno.InternalServerError.SetMessage("failed to save image file: %v", err)
 	}
+
+	// 处理标签
 	var imageTags []model.ImageTagM
 	for _, tag := range r.Tags {
 		imageTags = append(imageTags, model.ImageTagM{
 			Tag:       tag,
-			ImageUUID: imageUUID,
+			ImageUUID: imageUUID.String(),
 		})
 	}
-	imageM := model.ImageM{
-		ImageUUID: imageUUID,
-		Hash:      hash,
-		Token:     "",
-		UserUUID:  r.UserUUID,
+
+	// 解析用户UUID
+	userUUIDBin, err := uuid.Parse(r.UserUUID)
+	if err != nil {
+		return nil, errno.ErrInvalidParameter.SetMessage("invalid user UUID: %v", err)
+	}
+
+	// 创建图片记录
+	imageM := model.NewImageM{
+		ImageUUID: datatypes.BinUUID(imageUUID),
+		Hash:      []byte(hash),
+		Token:     []byte(""),
+		UserUUID:  datatypes.BinUUID(userUUIDBin),
 		IsPublic:  r.IsPublic,
 		Tags:      imageTags,
 	}
 	if err := i.db.Image().Create(ctx, &imageM); err != nil {
-		return nil, fmt.Errorf("failed to create image record: %w", err)
+		return nil, errno.InternalServerError.SetMessage("failed to create image record: %v", err)
 	}
 
+	// 复制响应数据
 	var ret api.CreateImageResponse
 	if err := copyImageInfo((*api.ImageInfo)(&ret), &imageM); err != nil {
-		return nil, fmt.Errorf("failed to copy image data: %w", err)
+		return nil, errno.InternalServerError.SetMessage("failed to copy image data: %v", err)
 	}
 	return &ret, nil
 }
 
 func (i *imageBiz) UpdateTags(ctx context.Context, userUUID string, imageUUID string, r *api.UpdateImageTagsRequest) error {
+	// 参数验证
 	if !govalidator.IsUUID(imageUUID) {
-		return fmt.Errorf("%w: invalid image UUID", errno.ErrInvalidParameter)
+		return errno.ErrInvalidParameter.SetMessage("invalid image UUID")
 	}
 	if !govalidator.IsUUID(userUUID) {
-		return fmt.Errorf("%w: invalid user UUID", errno.ErrInvalidParameter)
+		return errno.ErrInvalidParameter.SetMessage("invalid user UUID")
 	}
 	if len(r.Tags) == 0 {
-		return fmt.Errorf("%w: empty tags", errno.ErrInvalidParameter)
+		return errno.ErrInvalidParameter.SetMessage("tags cannot be empty")
 	}
-	imageM, getImageErr := i.db.Image().Get(ctx, imageUUID)
-	if getImageErr != nil {
-		return getImageErr
+
+	// 获取图片信息
+	imageM, err := i.db.Image().Get(ctx, imageUUID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errno.ErrImageNotFound.SetMessage("image %s not found", imageUUID)
+		}
+		return errno.InternalServerError.SetMessage("failed to get image: %v", err)
 	}
-	if imageM.UserUUID != userUUID {
-		return fmt.Errorf("%w: unauthorized operation", errno.ErrUnauthorized)
+
+	// 权限验证
+	if imageM.UserUUID.String() != userUUID {
+		return errno.ErrUnauthorized.SetMessage("access denied for image %s", imageUUID)
 	}
+
+	// 标签去重处理
 	tagSet := make(map[string]struct{})
 	var uniqueTags []string
 	for _, tag := range r.Tags {
@@ -144,31 +171,40 @@ func (i *imageBiz) UpdateTags(ctx context.Context, userUUID string, imageUUID st
 			uniqueTags = append(uniqueTags, normalized)
 		}
 	}
-	addTagsErr := i.db.Image().AddTagsToImage(ctx, imageUUID, uniqueTags)
-	if addTagsErr != nil {
-		return addTagsErr
+
+	// 更新标签
+	if err := i.db.Image().AddTagsToImage(ctx, imageUUID, uniqueTags); err != nil {
+		return errno.InternalServerError.SetMessage("failed to update image tags: %v", err)
 	}
 	return nil
 }
 
 func (i *imageBiz) Delete(ctx context.Context, userUUID string, imageUUID string) error {
-	// 参数校验
+	// 参数验证
 	if !govalidator.IsUUID(imageUUID) {
-		return fmt.Errorf("%w: invalid image UUID", errno.ErrInvalidParameter)
+		return errno.ErrInvalidParameter.SetMessage("invalid image UUID")
 	}
 	if !govalidator.IsUUID(userUUID) {
-		return fmt.Errorf("%w: invalid user UUID", errno.ErrInvalidParameter)
+		return errno.ErrInvalidParameter.SetMessage("invalid user UUID")
 	}
-	imageM, getImageErr := i.db.Image().Get(ctx, imageUUID)
-	if getImageErr != nil {
-		return getImageErr
+
+	// 获取图片信息
+	imageM, err := i.db.Image().Get(ctx, imageUUID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errno.ErrImageNotFound.SetMessage("image %s not found", imageUUID)
+		}
+		return errno.InternalServerError.SetMessage("failed to get image: %v", err)
 	}
-	if imageM.UserUUID != userUUID {
-		return fmt.Errorf("%w: unauthorized operation", errno.ErrUnauthorized)
+
+	// 权限验证
+	if imageM.UserUUID.String() != userUUID {
+		return errno.ErrUnauthorized.SetMessage("access denied for image %s", imageUUID)
 	}
-	delErr := i.db.Image().Delete(ctx, imageUUID)
-	if delErr != nil {
-		return delErr
+
+	// 删除图片
+	if err := i.db.Image().Delete(ctx, imageUUID); err != nil {
+		return errno.InternalServerError.SetMessage("failed to delete image: %v", err)
 	}
 	return nil
 }
@@ -180,57 +216,74 @@ func (i *imageBiz) DeleteCollection(ctx context.Context, userUUID string, imageU
 
 func (i *imageBiz) Get(ctx context.Context, userUUID string, imageUUID string) (*api.GetImageInfoResponse, error) {
 	isAnonymous := userUUID == ""
+
+	// 参数验证
 	if !govalidator.IsUUID(imageUUID) {
-		return nil, fmt.Errorf("%w: invalid image UUID", errno.ErrInvalidParameter)
+		return nil, errno.ErrInvalidParameter.SetMessage("invalid image UUID")
 	}
 	if !isAnonymous && !govalidator.IsUUID(userUUID) {
-		return nil, fmt.Errorf("%w: invalid user UUID", errno.ErrInvalidParameter)
+		return nil, errno.ErrInvalidParameter.SetMessage("invalid user UUID")
 	}
-	imageM, getImageErr := i.db.Image().Get(ctx, imageUUID)
-	if getImageErr != nil {
-		if errors.Is(getImageErr, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("%w: image=%s", errno.ErrImageNotFound, imageUUID)
+
+	// 获取图片信息
+	imageM, err := i.db.Image().Get(ctx, imageUUID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errno.ErrImageNotFound.SetMessage("image %s not found", imageUUID)
 		}
-		return nil, fmt.Errorf("db error: %w", getImageErr)
+		return nil, errno.InternalServerError.SetMessage("failed to get image: %v", err)
 	}
+
+	// 权限验证
 	if !imageM.IsPublic {
 		if isAnonymous {
-			return nil, fmt.Errorf("%w: authentication required", errno.ErrUnauthorized)
+			return nil, errno.ErrUnauthorized.SetMessage("authentication required")
 		}
-		if imageM.UserUUID != userUUID {
-			return nil, fmt.Errorf("%w: access denied for image %s", errno.ErrUnauthorized, imageUUID)
+		if imageM.UserUUID.String() != userUUID {
+			return nil, errno.ErrUnauthorized.SetMessage("access denied for image %s", imageUUID)
 		}
 	}
+
+	// 复制响应数据
 	var ret api.GetImageInfoResponse
 	if err := copyImageInfo((*api.ImageInfo)(&ret), imageM); err != nil {
-		return nil, fmt.Errorf("failed to copy image data: %w", err)
+		return nil, errno.InternalServerError.SetMessage("failed to copy image data: %v", err)
 	}
 	return &ret, nil
 }
 
 func (i *imageBiz) ListUserOwnImages(ctx context.Context, userUUID string, offset, limit int) (*api.ListImageResponse, error) {
+	// 参数验证
 	if offset < 0 {
-		return nil, fmt.Errorf("%w: invalid offset", errno.ErrInvalidParameter)
+		return nil, errno.ErrInvalidParameter.SetMessage("offset cannot be negative")
 	}
 	if limit < 0 {
-		return nil, fmt.Errorf("%w: invalid limit", errno.ErrInvalidParameter)
+		return nil, errno.ErrInvalidParameter.SetMessage("limit cannot be negative")
 	}
-	count, imageList, getImageErr := i.db.Image().GetUserImages(ctx, userUUID, offset, limit)
-	if getImageErr != nil {
-		return nil, getImageErr
+
+	// 获取用户图片列表
+	count, imageList, err := i.db.Image().GetUserImages(ctx, userUUID, offset, limit)
+	if err != nil {
+		return nil, errno.InternalServerError.SetMessage("failed to get user images: %v", err)
 	}
-	if count > 0 && imageList[0].UserUUID != userUUID {
-		return nil, fmt.Errorf("%w: unauthorized operation", errno.ErrUnauthorized)
+
+	// 权限验证
+	if count > 0 && imageList[0].UserUUID.String() != userUUID {
+		return nil, errno.ErrUnauthorized.SetMessage("unauthorized operation")
 	}
+
+	// 处理空结果
 	if count == 0 {
 		return &api.ListImageResponse{}, nil
 	}
+
+	// 构建响应
 	var ret api.ListImageResponse
 	ret.Count = int(count)
 	imageInfos := make([]api.ImageInfo, len(imageList))
 	for i, image := range imageList {
 		if err := copyImageInfo(&imageInfos[i], image); err != nil {
-			return nil, err
+			return nil, errno.InternalServerError.SetMessage("failed to copy image data: %v", err)
 		}
 	}
 	ret.ImageList = imageInfos
@@ -238,16 +291,21 @@ func (i *imageBiz) ListUserOwnImages(ctx context.Context, userUUID string, offse
 }
 
 func (i *imageBiz) ListUserOwnPublicImages(ctx context.Context, userUUID string, offset, limit int) (*api.ListImageResponse, error) {
+	// 参数验证
 	if offset < 0 {
-		return nil, fmt.Errorf("%w: invalid offset", errno.ErrInvalidParameter)
+		return nil, errno.ErrInvalidParameter.SetMessage("offset cannot be negative")
 	}
 	if limit < 0 {
-		return nil, fmt.Errorf("%w: invalid limit", errno.ErrInvalidParameter)
+		return nil, errno.ErrInvalidParameter.SetMessage("limit cannot be negative")
 	}
-	count, imageList, getImageErr := i.db.Image().GetUserImages(ctx, userUUID, offset, limit)
-	if getImageErr != nil {
-		return nil, getImageErr
+
+	// 获取用户图片列表
+	count, imageList, err := i.db.Image().GetUserImages(ctx, userUUID, offset, limit)
+	if err != nil {
+		return nil, errno.InternalServerError.SetMessage("failed to get user images: %v", err)
 	}
+
+	// 构建响应，只包含公开图片
 	var ret api.ListImageResponse
 	ret.Count = int(count)
 	imageInfos := make([]api.ImageInfo, 0)
@@ -255,30 +313,35 @@ func (i *imageBiz) ListUserOwnPublicImages(ctx context.Context, userUUID string,
 		if !image.IsPublic {
 			continue
 		}
-		var temp_image api.ImageInfo
-		if err := copyImageInfo(&temp_image, image); err != nil {
-			return nil, err
+		var tempImage api.ImageInfo
+		if err := copyImageInfo(&tempImage, image); err != nil {
+			return nil, errno.InternalServerError.SetMessage("failed to copy image data: %v", err)
 		}
-		imageInfos = append(imageInfos, temp_image)
+		imageInfos = append(imageInfos, tempImage)
 	}
 	ret.ImageList = imageInfos
 	return &ret, nil
 }
 
 func (i *imageBiz) ListRandomPublicImages(ctx context.Context, limit int) (*api.ListImageResponse, error) {
+	// 参数验证
 	if limit < 0 {
-		return nil, fmt.Errorf("%w: invalid limit", errno.ErrInvalidParameter)
+		return nil, errno.ErrInvalidParameter.SetMessage("limit cannot be negative")
 	}
-	count, imageList, getImageErr := i.db.Image().GetRandomPublicImages(ctx, limit)
-	if getImageErr != nil {
-		return nil, getImageErr
+
+	// 获取随机公开图片列表
+	count, imageList, err := i.db.Image().GetRandomPublicImages(ctx, limit)
+	if err != nil {
+		return nil, errno.InternalServerError.SetMessage("failed to get random public images: %v", err)
 	}
+
+	// 构建响应
 	var ret api.ListImageResponse
 	ret.Count = int(count)
 	imageInfos := make([]api.ImageInfo, len(imageList))
 	for i, image := range imageList {
 		if err := copyImageInfo(&imageInfos[i], image); err != nil {
-			return nil, err
+			return nil, errno.InternalServerError.SetMessage("failed to copy image data: %v", err)
 		}
 	}
 	ret.ImageList = imageInfos
@@ -288,45 +351,52 @@ func (i *imageBiz) ListRandomPublicImages(ctx context.Context, limit int) (*api.
 func (i *imageBiz) GetImageFile(ctx context.Context, userUUID string, imageUUIDFileName string) (filePath string, err error) {
 	isAnonymous := userUUID == ""
 
+	// 解析文件名和扩展名
 	ext := filepath.Ext(imageUUIDFileName)
 	imageUUID := strings.TrimSuffix(imageUUIDFileName, ext)
 	if ext == "" || len(ext) >= len(imageUUIDFileName) {
-		return "", fmt.Errorf("%w: missing or invalid file extension", errno.ErrImageFileInvalid)
+		return "", errno.ErrImageFileInvalid.SetMessage("missing or invalid file extension")
 	}
 	if !govalidator.IsUUID(imageUUID) {
-		return "", fmt.Errorf("%w: invalid image UUID", errno.ErrInvalidParameter)
+		return "", errno.ErrInvalidParameter.SetMessage("invalid image UUID")
 	}
 
+	// 验证文件格式
 	switch ext {
 	case ".png", ".webp", ".avif":
-		// ok
+		// 支持的格式
 	default:
-		return "", fmt.Errorf("%w: unsupported image format %s", errno.ErrImageFileInvalid, ext)
+		return "", errno.ErrImageFileInvalid.SetMessage("unsupported image format %s", ext)
 	}
 
+	// 参数验证
 	if !isAnonymous && !govalidator.IsUUID(userUUID) {
-		return "", fmt.Errorf("%w: invalid user UUID", errno.ErrInvalidParameter)
-	}
-	imageM, getImageErr := i.db.Image().Get(ctx, imageUUID)
-	if getImageErr != nil {
-		if errors.Is(getImageErr, gorm.ErrRecordNotFound) {
-			return "", fmt.Errorf("%w: image %s not found", errno.ErrImageNotFound, imageUUID)
-		}
-		return "", fmt.Errorf("db error: %w", getImageErr)
+		return "", errno.ErrInvalidParameter.SetMessage("invalid user UUID")
 	}
 
+	// 获取图片信息
+	imageM, err := i.db.Image().Get(ctx, imageUUID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", errno.ErrImageNotFound.SetMessage("image %s not found", imageUUID)
+		}
+		return "", errno.InternalServerError.SetMessage("failed to get image: %v", err)
+	}
+
+	// 权限验证
 	if !imageM.IsPublic {
 		if userUUID == "" {
-			return "", fmt.Errorf("%w: authentication required", errno.ErrUnauthorized)
+			return "", errno.ErrUnauthorized.SetMessage("authentication required")
 		}
-		if imageM.UserUUID != userUUID {
-			return "", fmt.Errorf("%w: access denied for image %s", errno.ErrUnauthorized, imageUUID)
+		if imageM.UserUUID.String() != userUUID {
+			return "", errno.ErrUnauthorized.SetMessage("access denied for image %s", imageUUID)
 		}
 	}
 
-	filePath, err = i.imageFileStore.GetFilePath(imageM.Hash, ext)
+	// 获取文件路径
+	filePath, err = i.imageFileStore.GetFilePath(string(imageM.Hash), ext)
 	if err != nil {
-		return "", fmt.Errorf("failed to find file: %w", err)
+		return "", errno.InternalServerError.SetMessage("failed to find file: %v", err)
 	}
 	return filePath, nil
 }

@@ -37,6 +37,10 @@ func (u *ImageM) TableName() string {
 	return "images"
 }
 
+func (u *NewImageM) TableName() string {
+	return "images"
+}
+
 func (u *ImageM) Equal(other *ImageM) bool {
 	if u == nil || other == nil {
 		return false
@@ -44,6 +48,25 @@ func (u *ImageM) Equal(other *ImageM) bool {
 	if u.ImageUUID != other.ImageUUID &&
 		u.Hash != other.Hash &&
 		u.Token != other.Token &&
+		u.UserUUID != other.UserUUID &&
+		u.IsPublic != other.IsPublic &&
+		len(u.Tags) != len(other.Tags) {
+		return false
+	}
+
+	slices.SortFunc(u.Tags, func(a, b ImageTagM) int { return cmp.Compare(a.Tag, b.Tag) })
+	slices.SortFunc(other.Tags, func(a, b ImageTagM) int { return cmp.Compare(a.Tag, b.Tag) })
+
+	return slices.EqualFunc(u.Tags, other.Tags, func(a, b ImageTagM) bool { return a.Tag == b.Tag })
+}
+
+func (u *NewImageM) Equal(other *NewImageM) bool {
+	if u == nil || other == nil {
+		return false
+	}
+	if u.ImageUUID != other.ImageUUID &&
+		string(u.Hash) != string(other.Hash) &&
+		string(u.Token) != string(other.Token) &&
 		u.UserUUID != other.UserUUID &&
 		u.IsPublic != other.IsPublic &&
 		len(u.Tags) != len(other.Tags) {

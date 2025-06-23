@@ -47,7 +47,7 @@ func setupImageDatabase() (*gorm.DB, *api.CreateUserRequest, string, error) {
 	if err := db.AutoMigrate(&model.UserM{}); err != nil {
 		return nil, nil, "", err
 	}
-	if err := db.AutoMigrate(&model.ImageM{}); err != nil {
+	if err := db.AutoMigrate(&model.NewImageM{}); err != nil {
 		return nil, nil, "", err
 	}
 	if err := db.AutoMigrate(&model.ImageTagM{}); err != nil {
