@@ -23,8 +23,8 @@ type ImageM struct {
 
 type NewImageM struct {
 	ImageUUID datatypes.BinUUID `gorm:"type:binary(16);column:imageUUID;primaryKey" json:"imageuuid"`
-	Hash      []byte            `gorm:"type:binary(32);column:hash;index;not null" json:"hash"`
-	Token     []byte            `gorm:"type:binary(32);column:token;index" json:"token"`
+	Hash      []byte            `gorm:"type:binary(64);column:hash;index;not null" json:"hash"`
+	Token     []byte            `gorm:"type:binary(64);column:token;index" json:"token"`
 	UserUUID  datatypes.BinUUID `gorm:"type:binary(16);column:userUUID;not null" json:"useruuid"`
 	IsPublic  bool              `gorm:"type:boolean;column:is_public;not null" json:"is_public"`
 	Tags      []ImageTagM       `gorm:"foreignKey:ImageUUID;references:ImageUUID" json:"tags"`

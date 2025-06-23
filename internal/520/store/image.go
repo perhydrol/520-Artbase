@@ -21,7 +21,7 @@ type ImageStore interface {
 	AddTagsToImage(ctx context.Context, imageUUID string, tags []string) error
 	DeleteTagFromImage(ctx context.Context, imageUUID string, tag []string) error
 	GetUserImages(ctx context.Context, UserUUID string, offset, limit int) (int64, []*model.NewImageM, error)
-	GetRandomPublicImages(ctx context.Context, limit int) (int, []*model.NewImageM, error)
+	GetRandomPublicImages(ctx context.Context, limit int) (count int64, ret []*model.NewImageM, err error)
 }
 
 type imageStore struct {
@@ -133,23 +133,32 @@ func (u *imageStore) DeleteTagFromImage(ctx context.Context, imageUUID string, t
 	return nil
 }
 
-func (u *imageStore) GetRandomPublicImages(ctx context.Context, limit int) (retCount int, ret []*model.NewImageM, err error) {
-	var allCount int64
-	if err := u.db.Model(&model.NewImageM{}).Where("is_public = ?", true).Count(&allCount).Error; err != nil {
+func (u *imageStore) GetRandomPublicImages(ctx context.Context, limit int) (count int64, ret []*model.NewImageM, err error) {
+	base := u.db.Model(&model.NewImageM{}).
+		Where("is_public = ?", true)
+
+	// 1. 获取总记录数（无分页）
+	if err := base.Count(&count).Error; err != nil {
 		return 0, nil, err
 	}
-	if allCount == 0 {
+
+	if count == 0 {
 		return 0, nil, nil
 	}
 	var offset int
-	if allCount <= int64(limit) {
-		retCount = int(allCount)
+	if count <= int64(limit) {
 		offset = 0
 	} else {
-		retCount = limit
-		offset = rand.Intn(int(allCount) - retCount)
+		offset = rand.Intn(int(count))
 	}
-	err = u.db.Model(&model.NewImageM{}).Preload("Tags").Where("is_public = ?", true).Offset(offset).Limit(limit).Find(&ret).Error
+	// 2. 获取分页结果
+	if err := base.
+		Preload("Tags").
+		Offset(offset).
+		Limit(limit).
+		Find(&ret).Error; err != nil {
+		return 0, nil, err
+	}
 	return
 }
 
@@ -158,7 +167,22 @@ func (u *imageStore) GetUserImages(ctx context.Context, UserUUID string, offset,
 	if err != nil {
 		return 0, nil, fmt.Errorf("invalid UUID format: %w", err)
 	}
-	err = u.db.Model(&model.NewImageM{}).Preload("Tags").Where("userUUID = ?", datatypes.BinUUID(uuidBin)).Offset(offset).Limit(limit).Find(&ret).Count(&count).Error
+	base := u.db.Model(&model.NewImageM{}).
+		Where("userUUID = ?", datatypes.BinUUID(uuidBin))
+
+	// 1. 获取总记录数（无分页）
+	if err := base.Count(&count).Error; err != nil {
+		return 0, nil, err
+	}
+
+	// 2. 获取分页结果
+	if err := base.
+		Preload("Tags").
+		Offset(offset).
+		Limit(limit).
+		Find(&ret).Error; err != nil {
+		return 0, nil, err
+	}
 	return
 }
 
@@ -167,6 +191,22 @@ func (u *imageStore) GetUserPublicImages(ctx context.Context, UserUUID string, o
 	if err != nil {
 		return 0, nil, fmt.Errorf("invalid UUID format: %w", err)
 	}
-	err = u.db.Model(&model.NewImageM{}).Preload("Tags").Where("userUUID = ?", datatypes.BinUUID(uuidBin)).Where("is_public = ?", true).Offset(offset).Limit(limit).Find(&ret).Count(&count).Error
+	base := u.db.Model(&model.NewImageM{}).
+		Where("userUUID = ?", datatypes.BinUUID(uuidBin)).
+		Where("is_public = ?", true)
+
+	// 1. 获取总记录数（无分页）
+	if err := base.Count(&count).Error; err != nil {
+		return 0, nil, err
+	}
+
+	// 2. 获取分页结果
+	if err := base.
+		Preload("Tags").
+		Offset(offset).
+		Limit(limit).
+		Find(&ret).Error; err != nil {
+		return 0, nil, err
+	}
 	return
 }
