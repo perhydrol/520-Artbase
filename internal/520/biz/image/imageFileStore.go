@@ -2,6 +2,7 @@ package image
 
 import (
 	"crypto/sha256"
+	"demo520/internal/pkg/config"
 	"demo520/internal/pkg/convert"
 	"demo520/internal/pkg/errno"
 	"demo520/internal/pkg/helper"
@@ -14,7 +15,6 @@ import (
 	"sync"
 
 	"github.com/gabriel-vasile/mimetype"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -40,7 +40,7 @@ var _ ImageFileStore = (*imageFileStore)(nil)
 
 func NewImageFileStore() ImageFileStore {
 	imageFileStoreOnce.Do(func() {
-		this = &imageFileStore{baseDir: viper.GetString("iamge.image_dir"), imageConverter: convert.InitImageConverter()}
+		this = &imageFileStore{baseDir: config.GetImage().ImageDir, imageConverter: convert.InitImageConverter()}
 	})
 	return this
 }

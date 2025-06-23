@@ -3,6 +3,7 @@ package image
 import (
 	"context"
 	"demo520/internal/520/store"
+	"demo520/internal/pkg/config"
 	"demo520/internal/pkg/errno"
 	"demo520/internal/pkg/model"
 	"demo520/pkg/api"
@@ -15,7 +16,6 @@ import (
 	"github.com/asaskevich/govalidator"
 	"github.com/google/uuid"
 	"github.com/jinzhu/copier"
-	"github.com/spf13/viper"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -75,7 +75,7 @@ func (i *imageBiz) Create(ctx context.Context, userUUID string, r *api.CreateIma
 	}
 
 	// 文件大小验证
-	imageMaxSize := viper.GetInt64("image.ImageMaxSize")
+	imageMaxSize := config.GetImage().ImageMaxSize
 	if fileHeader.Size > imageMaxSize {
 		return nil, errno.ErrImageFileTooLarge
 	}

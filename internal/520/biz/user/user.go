@@ -9,7 +9,6 @@ import (
 	"demo520/pkg/auth"
 	"demo520/pkg/token"
 	"errors"
-	"fmt"
 	"regexp"
 	"time"
 
@@ -40,7 +39,17 @@ func NewUserBiz(db store.IStore) UserBiz {
 }
 
 func (u *userBiz) ChangePassword(ctx context.Context, email string, r *api.ChangePasswordRequest) error {
-	return u.db.User().ChangePassword(ctx, email, r.OldPassword, r.NewPassword)
+	if err := u.db.User().ChangePassword(ctx, email, r.OldPassword, r.NewPassword); err != nil {
+		// ChangePassword方法内部已经处理了密码错误的情况，这里只处理其他错误
+		if errors.Is(err, errno.ErrPasswordIncorrect) {
+			return err
+		}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errno.ErrUserNotFound
+		}
+		return errno.InternalServerError.SetMessage("failed to change password: %v", err)
+	}
+	return nil
 }
 
 func (u *userBiz) Login(ctx context.Context, r *api.LoginRequest) (*api.LoginResponse, error) {
@@ -92,8 +101,7 @@ func (u *userBiz) Create(ctx context.Context, r *api.CreateUserRequest) error {
 		if match, _ := regexp.MatchString("Duplicate entry '.*' for key 'username'", err.Error()); match {
 			return errno.ErrUserAlreadyExist
 		}
-
-		return err
+		return errno.InternalServerError.SetMessage("failed to create user: %v", err)
 	}
 	return nil
 }
@@ -104,7 +112,7 @@ func (u *userBiz) Get(ctx context.Context, email string) (*api.GetUserInfoRespon
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errno.ErrUserNotFound
 		}
-		return nil, err
+		return nil, errno.InternalServerError.SetMessage("failed to get user: %v", err)
 	}
 	var resp api.GetUserInfoResponse
 	resp.UserUUID = user.UserUUID
@@ -117,21 +125,23 @@ func (u *userBiz) Get(ctx context.Context, email string) (*api.GetUserInfoRespon
 
 func (u *userBiz) Update(ctx context.Context, userUUID, email string, r *api.UpdateUserRequest) error {
 	if userUUID == "" || email == "" {
-		return fmt.Errorf("missing required parameters: userUUID=%s, email=%s", userUUID, email)
+		return errno.ErrInvalidParameter.SetMessage("missing required parameters: userUUID=%s, email=%s", userUUID, email)
 	}
 	if !govalidator.IsEmail(email) {
-		return fmt.Errorf("invalid email format: %s", email)
+		return errno.ErrInvalidParameter.SetMessage("invalid email format: %s", email)
 	}
 	if !govalidator.IsUUIDv4(userUUID) {
-		return fmt.Errorf("invalid uuid format: %s", userUUID)
+		return errno.ErrInvalidParameter.SetMessage("invalid uuid format: %s", userUUID)
 	}
 	userM, err := u.db.User().Get(ctx, email)
 	if err != nil {
-		return err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errno.ErrUserNotFound
+		}
+		return errno.InternalServerError.SetMessage("failed to get user: %v", err)
 	}
 	if userUUID != userM.UserUUID {
-		return fmt.Errorf("operation not permitted: userUUID mismatch (got %s)",
-			userUUID)
+		return errno.ErrUnauthorized.SetMessage("operation not permitted: userUUID mismatch (got %s)", userUUID)
 	}
 
 	if r.Email != "" {
@@ -143,7 +153,7 @@ func (u *userBiz) Update(ctx context.Context, userUUID, email string, r *api.Upd
 	}
 
 	if err := u.db.User().Update(ctx, userM); err != nil {
-		return err
+		return errno.InternalServerError.SetMessage("failed to update user: %v", err)
 	}
 
 	return nil
@@ -151,7 +161,7 @@ func (u *userBiz) Update(ctx context.Context, userUUID, email string, r *api.Upd
 
 func (u *userBiz) Delete(ctx context.Context, userUUID string) error {
 	if err := u.db.User().Delete(ctx, userUUID); err != nil {
-		return err
+		return errno.InternalServerError.SetMessage("failed to delete user: %v", err)
 	}
 	return nil
 }

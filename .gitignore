@@ -199,3 +199,5 @@ test/biz_test/temp_image
 test/test_image
 test/controller_test/temp_image
 cmd/520/main
+520
+config-gen

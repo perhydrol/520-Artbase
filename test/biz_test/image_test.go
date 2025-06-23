@@ -7,6 +7,7 @@ import (
 	"demo520/internal/520/biz/image"
 	"demo520/internal/520/biz/user"
 	"demo520/internal/520/store"
+	"demo520/internal/pkg/config"
 	"demo520/internal/pkg/model"
 	"demo520/pkg/api"
 	"fmt"
@@ -20,7 +21,6 @@ import (
 	"math/rand"
 
 	"github.com/go-faker/faker/v4"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/mysql"
@@ -101,8 +101,8 @@ func makeFileHeader(t *testing.T, filename, contentType string, content []byte) 
 }
 
 func setViper() {
-	viper.Set("ImageMaxSize", int64(20*1024*1024)) // 10 MB
-	viper.Set("image_dir", "temp_image")
+	// 使用配置管理包初始化配置
+	config.Init("")
 }
 
 func cleanTestData() {

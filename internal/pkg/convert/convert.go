@@ -2,6 +2,7 @@ package convert
 
 import (
 	"bytes"
+	"demo520/internal/pkg/config"
 	"demo520/internal/pkg/helper"
 	"demo520/internal/pkg/log"
 	"errors"
@@ -11,7 +12,6 @@ import (
 	"sync"
 
 	"github.com/davidbyttow/govips/v2/vips"
-	"github.com/spf13/viper"
 )
 
 type ImageConverter interface {
@@ -22,12 +22,12 @@ type ImageConverter interface {
 var (
 	once      sync.Once
 	converter imageConverter
-	c         config
+	c         convertConfig
 )
 
 type imageConverter struct{}
 
-type config struct {
+type convertConfig struct {
 	WebPQuality        int
 	WebReductionEffort int
 	AvifQuality        int
@@ -40,12 +40,13 @@ var _ ImageConverter = (*imageConverter)(nil)
 func InitImageConverter() ImageConverter {
 	once.Do(func() {
 		converter = imageConverter{}
-		c = config{
-			WebPQuality:        viper.GetInt("image.Convert.WebPQuality"),
-			WebReductionEffort: viper.GetInt("image.Convert.WebReductionEffort"),
-			AvifQuality:        viper.GetInt("image.Convert.AvifQuality"),
-			AvifEffort:         viper.GetInt("image.Convert.AvifEffort"),
-			Lossless:           viper.GetBool("image.Convert.ImageLossless"),
+		imageConfig := config.GetImage()
+		c = convertConfig{
+			WebPQuality:        imageConfig.Convert.WebPQuality,
+			WebReductionEffort: imageConfig.Convert.WebReductionEffort,
+			AvifQuality:        imageConfig.Convert.AvifQuality,
+			AvifEffort:         imageConfig.Convert.AvifEffort,
+			Lossless:           imageConfig.Convert.ImageLossless,
 		}
 		vips.Startup(nil)
 	})

@@ -5,6 +5,7 @@ import (
 	"demo520/internal/520/controller/image"
 	"demo520/internal/520/controller/user"
 	"demo520/internal/520/store"
+	"demo520/internal/pkg/config"
 	"demo520/pkg/api"
 	"encoding/json"
 	"fmt"
@@ -18,7 +19,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
@@ -108,8 +108,8 @@ func prepareContextWithFile(t *testing.T, filePath string, createReq *api.Create
 }
 
 func setViper() {
-	viper.Set("ImageMaxSize", int64(20*1024*1024)) // 10 MB
-	viper.Set("image_dir", "temp_image")
+	// 使用配置管理包初始化配置
+	config.Init("")
 }
 
 func cleanTestData() {
