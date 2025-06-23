@@ -83,6 +83,11 @@ func (i *imageBiz) Create(ctx context.Context, userUUID string, r *api.CreateIma
 		log.ErrorWithFunc(err, "参数验证失败", "parameter", "request")
 		return nil, err
 	}
+	if len(r.Tags) > config.GetImage().MaxTagCount {
+		err := errno.ErrInvalidParameter.SetMessage("Image's tags too much, max count is %d,action %d", config.GetImage().MaxTagCount, len(r.Tags))
+		log.ErrorWithFunc(err, "创建图片时标签过多", "parameter", "request")
+		return nil, err
+	}
 
 	// 文件大小验证
 	imageMaxSize := config.GetImage().ImageMaxSize
@@ -130,7 +135,7 @@ func (i *imageBiz) Create(ctx context.Context, userUUID string, r *api.CreateIma
 	}
 
 	// 解析用户UUID
-	userUUIDBin, err := uuid.Parse(r.UserUUID)
+	userUUIDBin, err := uuid.Parse(userUUID)
 	if err != nil {
 		return nil, errno.ErrInvalidParameter.SetMessage("invalid user UUID: %v", err)
 	}
@@ -201,6 +206,11 @@ func (i *imageBiz) UpdateTags(ctx context.Context, userUUID string, imageUUID st
 			tagSet[tag] = struct{}{}
 			uniqueTags = append(uniqueTags, normalized)
 		}
+	}
+	if len(uniqueTags) > config.GetImage().MaxTagCount {
+		err := errno.ErrInvalidParameter.SetMessage("Image's tags too much, max count is %d,action %d", config.GetImage().MaxTagCount, len(uniqueTags))
+		log.ErrorWithFunc(err, "图片标签过多", "parameter", "request")
+		return err
 	}
 
 	// 更新标签
@@ -358,7 +368,7 @@ func (i *imageBiz) ListUserOwnPublicImages(ctx context.Context, userUUID string,
 
 func (i *imageBiz) ListRandomPublicImages(ctx context.Context, limit int) (*api.ListImageResponse, error) {
 	// 参数验证
-	if limit < 0 {
+	if limit < 0 || limit > config.GetGetImage().RandomPublicLimit {
 		return nil, errno.ErrInvalidParameter.SetMessage("limit cannot be negative")
 	}
 
@@ -396,7 +406,7 @@ func (i *imageBiz) GetImageFile(ctx context.Context, userUUID string, imageUUIDF
 
 	// 验证文件格式
 	switch ext {
-	case ".png", ".webp", ".avif":
+	case ".png", ".webp", ".avif", ".jpg", ".jpeg":
 		// 支持的格式
 	default:
 		return "", errno.ErrImageFileInvalid.SetMessage("unsupported image format %s", ext)

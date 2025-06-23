@@ -21,8 +21,8 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
           example:
-            code: 401
-            message: "Invalid credentials"
+            code: "AuthFailure.TokenInvalid"
+            message: "Token was invalid"
     ForbiddenError:
       description: Access denied
       content:
@@ -30,8 +30,8 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
           example:
-            code: 403
-            message: "Access denied"
+            code: "AuthFailure.Unauthorized"
+            message: "Unauthorized"
     NotFoundError:
       description: Resource not found
       content:
@@ -39,8 +39,8 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
           example:
-            code: 404
-            message: "Resource not found"
+            code: "ResourceNotFound.PageNotFound"
+            message: "Page not found"
     ValidationError:
       description: Validation error
       content:
@@ -48,12 +48,8 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
           example:
-            code: 400
-            message: "Validation failed"
-            detail: "One or more fields contain invalid values"
-            validation_errors:
-              - field: "password"
-                reason: "must be at least 6 characters"
+            code: "InvalidParameter"
+            message: "Parameter verification failed"
     TooManyRequestsError:
       description: Rate limit exceeded
       content:
@@ -61,7 +57,7 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
           example:
-            code: 429
+            code: "TooManyRequests"
             message: "Too many requests"
 
   securitySchemes:
@@ -78,29 +74,13 @@ components:
       required: [code, message]
       properties:
         code:
-          type: integer
-          description: HTTP状态码或自定义错误码
-          example: 404
+          type: string
+          description: 业务错误码
+          example: "ResourceNotFound.ImageNotFound"
         message:
           type: string
           description: 人类可读的错误摘要
-          example: "Resource not found"
-        detail:
-          type: string
-          description: 可选的详细错误信息
-          example: "Image with ID 550e8400-e29b-41d4-a716-446655440000 not found"
-        validation_errors:
-          type: array
-          description: 字段级验证错误详情
-          items:
-            type: object
-            properties:
-              field:
-                type: string
-                example: "password"
-              reason:
-                type: string
-                example: "must be at least 6 characters"
+          example: "Image not found"
 
     LoginRequest:
       type: object
@@ -208,21 +188,11 @@ components:
           format: date-time
           description: 用户账户创建时间
           example: "2023-01-01T00:00:00Z"
-        updated_at:
-          type: string
-          format: date-time
-          description: 最后一次更新时间
-          example: "2023-01-02T00:00:00Z"
 
     CreateImageRequest:
       type: object
-      required: [owneruuid, is_public]
+      required: [is_public]
       properties:
-        owneruuid:
-          type: string
-          format: uuid
-          description: 图片所有者UUID
-          example: "550e8400-e29b-41d4-a716-446655440000"
         is_public:
           type: boolean
           description: 是否公开
@@ -342,15 +312,15 @@ paths:
           description: User created successfully
         400:
           $ref: "#/components/responses/ValidationError"
-        409:
-          description: Conflict
+        400:
+          description: Bad Request - User already exists
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
               example:
-                code: 409
-                message: "Email already exists"
+                code: "FailedOperation.UserAlreadyExist"
+                message: "User already exist"
         429:
           $ref: "#/components/responses/TooManyRequestsError"
 
@@ -374,7 +344,23 @@ paths:
               schema:
                 $ref: "#/components/schemas/LoginResponse"
         401:
-          $ref: "#/components/responses/UnauthorizedError"
+          description: Login failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                code: "ResourceNotFound.UserNotFoundOrPasswordIncorrect"
+                message: "Incorrect username or password"
+        404:
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                code: "ResourceNotFound.UserNotFoundOrPasswordIncorrect"
+                message: "Incorrect username or password"
         429:
           $ref: "#/components/responses/TooManyRequestsError"
 
@@ -462,15 +448,15 @@ paths:
           $ref: "#/components/responses/UnauthorizedError"
         403:
           $ref: "#/components/responses/ForbiddenError"
-        409:
-          description: Conflict
+        400:
+          description: Bad Request - Email already exists
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
               example:
-                code: 409
-                message: "Email already exists"
+                code: "FailedOperation.UserAlreadyExist"
+                message: "User already exist"
         429:
           $ref: "#/components/responses/TooManyRequestsError"
 
@@ -616,7 +602,14 @@ paths:
         403:
           $ref: "#/components/responses/ForbiddenError"
         404:
-          $ref: "#/components/responses/NotFoundError"
+          description: Image not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                code: "ResourceNotFound.ImageNotFound"
+                message: "Image not found"
         429:
           $ref: "#/components/responses/TooManyRequestsError"
     patch:
@@ -655,7 +648,14 @@ paths:
         403:
           $ref: "#/components/responses/ForbiddenError"
         404:
-          $ref: "#/components/responses/NotFoundError"
+          description: Image not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                code: "ResourceNotFound.ImageNotFound"
+                message: "Image not found"
         429:
           $ref: "#/components/responses/TooManyRequestsError"
   /images/file/{imageUUIDFileName}:
@@ -664,7 +664,7 @@ paths:
         - Images
       summary: 下载图片文件
       description: |
-        下载指定图像的原始文件。参数中应包含 UUID 和扩展名（例如 550e8400-e29b-41d4-a716-446655440001.png）。
+        下载指定图像的原始文件。参数中应包含 UUID 和扩展名（例如 550e8400-e29b-41d4-a716-446655440001.png 或 550e8400-e29b-41d4-a716-446655440001.jpg）。
         公共图像可匿名访问；私有图像需带 Bearer JWT。
       operationId: downloadImageFile
       security:
@@ -675,8 +675,8 @@ paths:
           required: true
           schema:
             type: string
-            pattern: '^[0-9a-fA-F\-]{36}\.(png|webp|avif)$'
-          description: 图像文件名，必须为 36 位 UUID + '.' + 扩展名 (.png/.webp/.avif)
+            pattern: '^[0-9a-fA-F\-]{36}\.(png|webp|avif|jpg|jpeg)$'
+          description: 图像文件名，必须为 36 位 UUID + '.' + 扩展名 (.png/.webp/.avif/.jpg/.jpeg)
           example: "550e8400-e29b-41d4-a716-446655440001.webp"
       responses:
         "200":
@@ -691,7 +691,14 @@ paths:
         "403":
           $ref: "#/components/responses/ForbiddenError"
         "404":
-          $ref: "#/components/responses/NotFoundError"
+          description: Image not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                code: "ResourceNotFound.ImageNotFound"
+                message: "Image not found"
         "429":
           $ref: "#/components/responses/TooManyRequestsError"
 
@@ -719,6 +726,13 @@ paths:
         403:
           $ref: "#/components/responses/ForbiddenError"
         404:
-          $ref: "#/components/responses/NotFoundError"
+          description: Image not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                code: "ResourceNotFound.ImageNotFound"
+                message: "Image not found"
         429:
           $ref: "#/components/responses/TooManyRequestsError"

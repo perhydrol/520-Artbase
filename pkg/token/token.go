@@ -1,8 +1,10 @@
 package token
 
 import (
+	"demo520/internal/pkg/errno"
 	"demo520/internal/pkg/log"
 	"errors"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -11,9 +13,25 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var ErrMissingHeader = errors.New("the length of the `Authorization` header is zero")
-var ErrInvalidToken = errors.New("the `Authorization` header is invalid")
-var ErrSigningMethod = errors.New("the `Authorization` signing method is invalid")
+var (
+	ErrMissingHeader = &errno.Errno{
+		HTTP:    http.StatusBadRequest,     // 客户端错误，不是服务器错误
+		Code:    "MissingHeader",           // 唯一错误码
+		Message: "Missing required header", // 清晰可读的错误信息
+	}
+
+	ErrInvalidToken = &errno.Errno{
+		HTTP:    http.StatusUnauthorized,
+		Code:    "InvalidToken",
+		Message: "Invalid authentication token",
+	}
+
+	ErrSigningMethod = &errno.Errno{
+		HTTP:    http.StatusUnauthorized,
+		Code:    "InvalidSigningMethod",
+		Message: "Invalid JWT signing method",
+	}
+)
 
 var (
 	jwtSecretKey string

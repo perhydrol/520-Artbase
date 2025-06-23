@@ -23,9 +23,10 @@ func (ctrl *UserController) Create(c *gin.Context) {
 		return
 	}
 
-	if err := ctrl.b.Users().Create(c, &r); err != nil {
+	userInfo, err := ctrl.b.Users().Create(c, &r)
+	if err != nil {
 		core.WriteResponse(c, err, nil)
 		return
 	}
-	core.WriteResponse(c, nil, nil)
+	core.WriteResponse(c, nil, userInfo)
 }

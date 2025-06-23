@@ -10,7 +10,7 @@ import (
 )
 
 func (ctrl *ImageController) GetUserImagesList(ctx *gin.Context) {
-	log.C(ctx).Infow("Get Public List")
+	log.C(ctx).Infow("Get User All images List")
 
 	var listRange ListRange
 	if err := ctx.ShouldBindQuery(&listRange); err != nil {

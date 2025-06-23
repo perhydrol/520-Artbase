@@ -13,9 +13,9 @@ import (
 func (ctrl *ImageController) DeleteImage(ctx *gin.Context) {
 	log.C(ctx).Infow("DeleteImage")
 
-	var req string = ctx.Param("imageuuid")
+	imageUUID := ctx.Param("image_uuid")
 
-	if _, err := govalidator.ValidateStruct(req); err != nil {
+	if imageUUID == "" || !govalidator.IsUUID(imageUUID) {
 		core.WriteResponse(ctx, errno.ErrInvalidParameter, nil)
 		return
 	}
@@ -25,7 +25,7 @@ func (ctrl *ImageController) DeleteImage(ctx *gin.Context) {
 		core.WriteResponse(ctx, errno.ErrTokenInvalid, nil)
 		return
 	}
-	if err := ctrl.b.Images().Delete(ctx, jwtUserUUID, ctx.Param("imageId")); err != nil {
+	if err := ctrl.b.Images().Delete(ctx, jwtUserUUID, imageUUID); err != nil {
 		core.WriteResponse(ctx, err, nil)
 		return
 	}

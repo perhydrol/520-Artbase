@@ -55,7 +55,7 @@ func TestUserBiz_Create_ErrorCases(t *testing.T) {
 			defer teardownBizTest(ts, t)
 
 			ctx := context.Background()
-			err := userBiz.Create(ctx, tt.req)
+			_, err := userBiz.Create(ctx, tt.req)
 			assert.Error(t, err)
 			// 如果有具体的错误类型，可以进一步验证
 			// assert.Equal(t, tt.wantErr, err)
@@ -86,7 +86,7 @@ func TestUserBiz_Create_DuplicateEmail(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	err := userBiz.Create(ctx, duplicateReq)
+	_, err := userBiz.Create(ctx, duplicateReq)
 	assert.Error(t, err)
 	assert.Equal(t, errno.ErrUserAlreadyExist, err)
 }

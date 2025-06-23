@@ -34,6 +34,7 @@ type ImageFileStore interface {
 type imageFileStore struct {
 	baseDir        string
 	imageConverter convert.ImageConverter
+	fileLocks      sync.Map
 }
 
 var _ ImageFileStore = (*imageFileStore)(nil)
@@ -53,6 +54,19 @@ func (i *imageFileStore) Save(fileHeader *multipart.FileHeader, hash string) err
 	if hash == "" {
 		return fmt.Errorf("hash cannot be empty")
 	}
+
+	// 生成存储路径
+	pathDir, err := genPathDir(hash)
+	if err != nil {
+		return fmt.Errorf("generate pathDir failed: %w", err)
+	}
+
+	// 防止恶意构造相同文件引起竞争
+	mu, _ := i.fileLocks.LoadOrStore(pathDir, &sync.Mutex{})
+	mutex := mu.(*sync.Mutex)
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	// 检查是否已存在
 	exists, err := i.IsContainerImage(hash)
 	if err != nil {
@@ -61,11 +75,7 @@ func (i *imageFileStore) Save(fileHeader *multipart.FileHeader, hash string) err
 	if exists {
 		return nil
 	}
-	// 生成存储路径
-	pathDir, err := genPathDir(hash)
-	if err != nil {
-		return fmt.Errorf("generate pathDir failed: %w", err)
-	}
+
 	// 创建目录（更严格的权限）
 	fullDirPath := filepath.Join(i.baseDir, pathDir)
 	if err := os.MkdirAll(fullDirPath, 0750); err != nil { // 750更安全

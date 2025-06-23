@@ -20,7 +20,7 @@ func (ctrl *ImageController) GetUserPublicList(ctx *gin.Context) {
 
 	// 获取公开图片，无需认证。直接从参数中解析UUID即可
 	var userUUID string
-	if userUUID = ctx.Param("userUUID"); userUUID == "" || !govalidator.IsUUID(userUUID) {
+	if userUUID = ctx.Param("user_uuid"); userUUID == "" || !govalidator.IsUUID(userUUID) {
 		core.WriteResponse(ctx, errno.ErrBind, nil)
 		return
 	}

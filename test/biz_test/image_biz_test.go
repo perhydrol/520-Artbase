@@ -26,7 +26,6 @@ func TestImageBiz_Create_ErrorCases(t *testing.T) {
 	fileHeader := makeFileHeader(t, "test.jpg", "image/jpeg", []byte("fake image data"))
 	tags := []string{faker.Word()}
 	req := &api.CreateImageRequest{
-		UserUUID: invalidUserUUID,
 		IsPublic: true,
 		Tags:     tags,
 	}
@@ -36,7 +35,6 @@ func TestImageBiz_Create_ErrorCases(t *testing.T) {
 
 	// 测试空文件
 	emptyFileHeader := makeFileHeader(t, "empty.jpg", "image/jpeg", []byte(""))
-	req.UserUUID = userUUID
 	_, err = imageBiz.Create(ctx, userUUID, req, emptyFileHeader)
 	assert.Error(t, err)
 

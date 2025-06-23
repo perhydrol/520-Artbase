@@ -1,45 +1,34 @@
-# Demo520 服务配置文件
-# 这是一个示例配置文件，包含了所有可配置的选项及其默认值
-
-# 服务器配置
-server:
-  addr: ":8080"  # 服务监听地址
-
-# 数据库配置
-db:
-  host: "127.0.0.1:3306"           # 数据库主机地址
-  username: "root"                  # 数据库用户名
-  password: ""                      # 数据库密码
-  database: "demo520"               # 数据库名称
-  max-idle-connections: 10          # 最大空闲连接数
-  max-open-connections: 100         # 最大打开连接数
-  max-connection-life-time: "10s"   # 连接最大生存时间
-  log-level: 1                      # 数据库日志级别
-
-# 日志配置
-log:
-  disable-caller: false             # 是否禁用调用者信息
-  disable-stacktrace: false         # 是否禁用堆栈跟踪
-  level: "info"                     # 日志级别 (debug, info, warn, error)
-  encoding: "console"               # 日志编码格式 (console, json)
-  output-paths:                     # 日志输出路径
-    - "stdout"
-
-# 图片处理配置
-image:
-  ImageMaxSize: 20971520            # 图片最大大小 (20MB)
-  image_dir: "temp_image"           # 图片存储目录
-  Convert:                          # 图片转换配置
-    WebPQuality: 80                 # WebP 质量 (0-100)
-    WebReductionEffort: 4           # WebP 压缩努力程度 (0-6)
-    AvifQuality: 60                 # AVIF 质量 (0-100)
-    AvifEffort: 4                   # AVIF 压缩努力程度 (0-9)
-    ImageLossless: false            # 是否使用无损压缩
-
-# JWT 配置
-jwt:
-  secret: "demo520-secret-key"      # JWT 签名密钥
-
-# 应用配置
 app:
-  runmode: "debug"                  # 运行模式 (debug, release, test)
+    runmode: debug
+db:
+    host: 127.0.0.1:3316
+    username: root
+    password: "testpassword"
+    database: testdb
+    max-idle-connections: 10
+    max-open-connections: 100
+    max-connection-life-time: 10s
+    log-level: 1
+image:
+    ImageMaxSize: 20971520
+    image_dir: temp_image
+    Convert:
+        WebPQuality: 80
+        WebReductionEffort: 4
+        AvifQuality: 60
+        AvifEffort: 4
+        ImageLossless: false
+    MaxTagCount: 20
+jwt:
+    secret: demo520-secret-key
+log:
+    disable-caller: false
+    disable-stacktrace: false
+    level: info
+    encoding: console
+    output-paths:
+        - stdout
+login:
+    timing_attack_protection: 5
+server:
+    addr: :8080

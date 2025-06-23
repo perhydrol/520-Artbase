@@ -1,6 +1,7 @@
 package image
 
 import (
+	"demo520/internal/520/controller"
 	"demo520/internal/pkg/core"
 	"demo520/internal/pkg/errno"
 	"demo520/internal/pkg/log"
@@ -25,9 +26,11 @@ func (ctrl *ImageController) UpdateImageTags(ctx *gin.Context) {
 		return
 	}
 
-	userUUID, ok := ctx.Value("useruuid").(string)
-	if !ok {
-		core.WriteResponse(ctx, errno.ErrUnauthorized, nil)
+	userUUID, exists := controller.GetUserUUIDFromContext(ctx)
+	if !exists {
+		err := errno.ErrTokenInvalid
+		log.ErrorWithFunc(err, "无法从JWT中获取用户UUID")
+		core.WriteResponse(ctx, err, nil)
 		return
 	}
 

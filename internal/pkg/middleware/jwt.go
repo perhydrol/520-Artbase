@@ -18,7 +18,7 @@ func JWTAuth() gin.HandlerFunc {
 				ctx.Set(CtxJWTUserUUID, "")
 				ctx.Next()
 			} else {
-				core.WriteResponse(ctx, err, nil)
+				core.WriteResponse(ctx, token.ErrInvalidToken, nil)
 				ctx.Abort()
 				return
 			}

@@ -8,7 +8,7 @@ import (
 func TestInitLogger(t *testing.T) {
 
 	// 调用你的 log.Init 函数
-	log.Init(nil)
+	log.Init(log.NewLogConfig())
 	log.Infow("Hello World-info")
 	log.Warnw("Hello World-warn")
 	log.Errorw("Hello World-error")

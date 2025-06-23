@@ -19,17 +19,28 @@ const (
 
 // Config 定义了应用程序的完整配置结构
 type Config struct {
-	Server ServerConfig `mapstructure:"server" yaml:"server"`
-	DB     DBConfig     `mapstructure:"db" yaml:"db"`
-	Log    LogConfig    `mapstructure:"log" yaml:"log"`
-	Image  ImageConfig  `mapstructure:"image" yaml:"image"`
-	JWT    JWTConfig    `mapstructure:"jwt" yaml:"jwt"`
-	App    AppConfig    `mapstructure:"app" yaml:"app"`
+	Server   ServerConfig   `mapstructure:"server" yaml:"server"`
+	DB       DBConfig       `mapstructure:"db" yaml:"db"`
+	Log      LogConfig      `mapstructure:"log" yaml:"log"`
+	Image    ImageConfig    `mapstructure:"image" yaml:"image"`
+	JWT      JWTConfig      `mapstructure:"jwt" yaml:"jwt"`
+	App      AppConfig      `mapstructure:"app" yaml:"app"`
+	Login    LoginConfig    `mapstructure:"login" yaml:"login"`
+	GetImage GetImageConfig `mapstructure:"get_image" yaml:"get_image"`
 }
 
 // ServerConfig 服务器配置
 type ServerConfig struct {
 	Addr string `mapstructure:"addr" yaml:"addr"`
+}
+
+type GetImageConfig struct {
+	RandomPublicLimit int `mapstructure:"random_public_limit" yaml:"random_public_limit"`
+}
+
+// Login 登录配置
+type LoginConfig struct {
+	TimingAttackProtection int `mapstructure:"timing_attack_protection" yaml:"timing_attack_protection"`
 }
 
 // DBConfig 数据库配置
@@ -55,9 +66,10 @@ type LogConfig struct {
 
 // ImageConfig 图片处理配置
 type ImageConfig struct {
-	ImageMaxSize int64        `mapstructure:"ImageMaxSize" yaml:"ImageMaxSize"`
-	ImageDir     string       `mapstructure:"image_dir" yaml:"image_dir"`
+	ImageMaxSize int64         `mapstructure:"ImageMaxSize" yaml:"ImageMaxSize"`
+	ImageDir     string        `mapstructure:"image_dir" yaml:"image_dir"`
 	Convert      ConvertConfig `mapstructure:"Convert" yaml:"Convert"`
+	MaxTagCount  int           `mapstructure:"MaxTagCount" yaml:"MaxTagCount"`
 }
 
 // ConvertConfig 图片转换配置
@@ -176,12 +188,18 @@ func setDefaults() {
 	viper.SetDefault("image.Convert.AvifQuality", 60)
 	viper.SetDefault("image.Convert.AvifEffort", 4)
 	viper.SetDefault("image.Convert.ImageLossless", false)
+	viper.SetDefault("image.MaxTagCount", 20)
 
 	// JWT配置默认值
 	viper.SetDefault("jwt.secret", "demo520-secret-key")
 
+	// 登录请求失效时间
+	viper.SetDefault("login.timing_attack_protection", 5)
+
 	// 应用配置默认值
 	viper.SetDefault("app.runmode", "debug")
+
+	viper.SetDefault("get_image.random_public_limit", 50)
 }
 
 // GetConfig 获取全局配置
@@ -189,9 +207,18 @@ func GetConfig() *Config {
 	return globalConfig
 }
 
+func GetGetImage() *GetImageConfig {
+	return &globalConfig.GetImage
+}
+
 // GetServer 获取服务器配置
 func GetServer() *ServerConfig {
 	return &globalConfig.Server
+}
+
+// GetLogin 获取登录配置
+func GetLogin() *LoginConfig {
+	return &globalConfig.Login
 }
 
 // GetDB 获取数据库配置
@@ -249,6 +276,7 @@ func GenerateDefaultConfig(filePath string) error {
 		Image: ImageConfig{
 			ImageMaxSize: viper.GetInt64("image.ImageMaxSize"),
 			ImageDir:     viper.GetString("image.image_dir"),
+			MaxTagCount:  viper.GetInt("image.MaxTagCount"),
 			Convert: ConvertConfig{
 				WebPQuality:        viper.GetInt("image.Convert.WebPQuality"),
 				WebReductionEffort: viper.GetInt("image.Convert.WebReductionEffort"),
@@ -260,8 +288,14 @@ func GenerateDefaultConfig(filePath string) error {
 		JWT: JWTConfig{
 			Secret: viper.GetString("jwt.secret"),
 		},
+		Login: LoginConfig{
+			TimingAttackProtection: viper.GetInt("login.timing_attack_protection"),
+		},
 		App: AppConfig{
 			RunMode: viper.GetString("app.runmode"),
+		},
+		GetImage: GetImageConfig{
+			RandomPublicLimit: viper.GetInt("get_image.random_public_limit"),
 		},
 	}
 
@@ -272,6 +306,8 @@ func GenerateDefaultConfig(filePath string) error {
 	viper.Set("image", defaultConfig.Image)
 	viper.Set("jwt", defaultConfig.JWT)
 	viper.Set("app", defaultConfig.App)
+	viper.Set("login", defaultConfig.Login)
+	viper.Set("get_image", defaultConfig.GetImage)
 
 	// 写入文件
 	return viper.WriteConfigAs(filePath)

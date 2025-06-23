@@ -40,7 +40,7 @@ func createTestUserViaBiz(t *testing.T, userBiz user.UserBiz, req *api.CreateUse
 	} else {
 		createReq = *req
 	}
-	err := userBiz.Create(ctx, &createReq)
+	_, err := userBiz.Create(ctx, &createReq)
 	require.NoError(t, err)
 	getResp, err := userBiz.Get(ctx, createReq.Email)
 	require.NoError(t, err)

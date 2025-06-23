@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"demo520/internal/520/store"
+	"demo520/internal/pkg/config"
 	"demo520/internal/pkg/errno"
 	"demo520/internal/pkg/log"
 	"demo520/internal/pkg/model"
@@ -20,7 +21,7 @@ import (
 type UserBiz interface {
 	ChangePassword(ctx context.Context, email string, r *api.ChangePasswordRequest) error
 	Login(ctx context.Context, r *api.LoginRequest) (*api.LoginResponse, error)
-	Create(ctx context.Context, r *api.CreateUserRequest) error
+	Create(ctx context.Context, r *api.CreateUserRequest) (*api.UserInfo, error)
 	Get(ctx context.Context, email string) (*api.GetUserInfoResponse, error)
 	Update(ctx context.Context, userUUID, email string, r *api.UpdateUserRequest) error
 	Delete(ctx context.Context, userUUID string) error
@@ -78,7 +79,8 @@ func (u *userBiz) Login(ctx context.Context, r *api.LoginRequest) (*api.LoginRes
 	now := time.Now().UTC()
 	utcTime := t.UTC()
 	duration := now.Sub(utcTime)
-	if duration < 0 || duration >= 5*time.Minute {
+	timeout := time.Duration(config.GetLogin().TimingAttackProtection) * time.Minute
+	if duration < 0 || duration >= timeout {
 		err := errno.ErrUserLoginRequestOutTime
 		log.ErrorWithFunc(err, "登录请求时间超时",
 			"email", r.Email,
@@ -104,7 +106,7 @@ func (u *userBiz) Login(ctx context.Context, r *api.LoginRequest) (*api.LoginRes
 	return &api.LoginResponse{Token: jwt}, nil
 }
 
-func (u *userBiz) Create(ctx context.Context, r *api.CreateUserRequest) error {
+func (u *userBiz) Create(ctx context.Context, r *api.CreateUserRequest) (*api.UserInfo, error) {
 	defer log.FuncEntryWithContext(ctx, r.Email, "***")()
 
 	var userM model.UserM
@@ -115,18 +117,27 @@ func (u *userBiz) Create(ctx context.Context, r *api.CreateUserRequest) error {
 		userM.UserUUID = uuid.New().String()
 	} else {
 		if errs, ok := err.(govalidator.Errors); ok {
-			return errno.ErrInvalidParameter.SetMessage("validation failed: %s", errs.Error())
+			return nil, errno.ErrInvalidParameter.SetMessage("validation failed: %s", errs.Error())
 		}
-		return errno.ErrInvalidParameter.SetMessage("validation failed: %v", err)
+		return nil, errno.ErrInvalidParameter.SetMessage("validation failed: %v", err)
 	}
 
 	if err := u.db.User().Create(ctx, &userM); err != nil {
 		if store.IsDuplicateKeyError(err) {
-			return errno.ErrUserAlreadyExist
+			return nil, errno.ErrUserAlreadyExist
 		}
-		return errno.InternalServerError.SetMessage("failed to create user: %v", err)
+		return nil, errno.InternalServerError.SetMessage("failed to create user: %v", err)
 	}
-	return nil
+
+	// Return the created user information
+	userInfo := &api.UserInfo{
+		Email:    userM.Email,
+		UserUUID: userM.UserUUID,
+		Nickname: userM.Nickname,
+		CreateAt: userM.CreatedAt.Format(time.RFC3339),
+	}
+
+	return userInfo, nil
 }
 
 func (u *userBiz) Get(ctx context.Context, email string) (*api.GetUserInfoResponse, error) {

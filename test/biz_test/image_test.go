@@ -42,7 +42,7 @@ func setupImageBizTest(t *testing.T) (*testhelper.TestSuite, image.ImageBiz, use
 		Password: faker.Password(),
 	}
 	ctx := context.Background()
-	err := userBiz.Create(ctx, userReq)
+	_, err := userBiz.Create(ctx, userReq)
 	require.NoError(t, err)
 
 	userInfo, err := userBiz.Get(ctx, userReq.Email)
@@ -63,7 +63,6 @@ func createTestImageViaBiz(t *testing.T, imageBiz image.ImageBiz, userUUID strin
 	fileHeader := makeFileHeader(t, filepath.Base(test_image_path), "image/png", imageByte)
 	ctx := context.Background()
 	req := &api.CreateImageRequest{
-		UserUUID: userUUID,
 		IsPublic: isPublic,
 		Tags:     tags,
 	}
@@ -123,7 +122,6 @@ func createTestImageListViaBiz(t *testing.T, imageBiz image.ImageBiz, userUUID s
 		require.NoError(t, err)
 		fileHeader := makeFileHeader(t, fmt.Sprintf("test_image_%d.png", i), "image/png", imageByte)
 		createImageReq := api.CreateImageRequest{
-			UserUUID: userUUID,
 			IsPublic: rand.Intn(10)%2 == 0, // 随机设置公开状态
 			Tags:     []string{faker.Word(), faker.Word()},
 		}
@@ -144,7 +142,6 @@ func TestImage_Create_Success(t *testing.T) {
 	require.NoError(t, err)
 	fileHeader := makeFileHeader(t, filepath.Base(test_image_path), "image/png", imageByte)
 	req := &api.CreateImageRequest{
-		UserUUID: userUUID,
 		IsPublic: true,
 		Tags:     tags,
 	}

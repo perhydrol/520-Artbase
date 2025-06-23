@@ -16,6 +16,9 @@ var (
 	// ErrInvalidParameter 表示所有验证失败的错误.
 	ErrInvalidParameter = &Errno{HTTP: 400, Code: "InvalidParameter", Message: "Parameter verification failed."}
 
+	// ErrGetImageFile 表示获取图片文件时出错.
+	ErrGetImageFile = &Errno{HTTP: 400, Code: "InvalidParameter.GetImageFileError", Message: "Error occurred while getting image file."}
+
 	// ErrSignToken 表示签发 JWT Token 时出错.
 	ErrSignToken = &Errno{HTTP: 401, Code: "AuthFailure.SignTokenError", Message: "Error occurred while signing the JSON web token."}
 
