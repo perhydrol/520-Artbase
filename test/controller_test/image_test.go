@@ -22,7 +22,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-var test_image_path = "../test_image.png"
+var test_image_path = "../test_image/cg_tm01_0101__base_cg_tm01_0101(CUnet)(noise_scale)(Level1)(x2).png"
 var test_iamge_list_path = "../test_image"
 
 func setupImageDatabase() (*gorm.DB, error) {

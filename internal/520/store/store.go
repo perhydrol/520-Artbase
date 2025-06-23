@@ -1,8 +1,10 @@
 package store
 
 import (
-	"gorm.io/gorm"
+	"strings"
 	"sync"
+
+	"gorm.io/gorm"
 )
 
 var (
@@ -39,4 +41,13 @@ func (s *datastore) User() UserStore {
 
 func (s *datastore) Image() ImageStore {
 	return newImageStore(s.db)
+}
+
+func IsDuplicateKeyError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "duplicate key") || // PostgreSQL
+		strings.Contains(err.Error(), "Duplicate entry") || // MySQL
+		strings.Contains(err.Error(), "UNIQUE constraint failed") // SQLite
 }

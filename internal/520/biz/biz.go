@@ -4,6 +4,12 @@ import (
 	"demo520/internal/520/biz/image"
 	"demo520/internal/520/biz/user"
 	"demo520/internal/520/store"
+	"sync"
+)
+
+var (
+	once sync.Once
+	ibiz *biz
 )
 
 type IBiz interface {
@@ -18,7 +24,10 @@ type biz struct {
 var _ IBiz = (*biz)(nil)
 
 func NewIBiz(db store.IStore) IBiz {
-	return &biz{db}
+	once.Do(func() {
+		ibiz = &biz{db}
+	})
+	return ibiz
 }
 
 func (b *biz) Images() image.ImageBiz {

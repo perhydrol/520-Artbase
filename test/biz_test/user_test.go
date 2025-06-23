@@ -2,47 +2,33 @@ package biz_test
 
 import (
 	"context"
-	"demo520/internal/520/biz"
-	"demo520/internal/520/store"
+	"demo520/internal/520/biz/user"
 	"demo520/internal/pkg/errno"
-	"demo520/internal/pkg/model"
 	"demo520/pkg/api"
 	"demo520/pkg/token"
-	"fmt"
+	"demo520/test/testhelper"
 	"testing"
 	"time"
 
 	"github.com/go-faker/faker/v4"
 	"github.com/stretchr/testify/assert"
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
+	"github.com/stretchr/testify/require"
 )
 
-func setupUserDatabase() (*gorm.DB, error) {
-	// 3. 构造 DSN
-	dsn := fmt.Sprintf("root:%s@tcp(127.0.0.1:3316)/testdb?charset=utf8mb4&parseTime=True&loc=Local", "testpassword")
-
-	// 4. 连接数据库
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// 自动迁移
-	if err := db.AutoMigrate(&model.UserM{}); err != nil {
-		return nil, err
-	}
-
-	return db, nil
+// setupBizTest 设置biz层测试环境
+func setupBizTest(t *testing.T) (*testhelper.TestSuite, user.UserBiz) {
+	ts := testhelper.NewTestSuite(t, nil)
+	userBiz := user.NewUserBiz(ts.Store)
+	return ts, userBiz
 }
 
-func genNewUser(t *testing.T, db *gorm.DB, req *api.CreateUserRequest) (*api.CreateUserRequest, error) {
-	iStore := store.NewStore(db)
-	biz := biz.NewIBiz(iStore)
-	userBiz := biz.Users()
+// teardownBizTest 清理biz层测试环境
+func teardownBizTest(ts *testhelper.TestSuite, t *testing.T) {
+	ts.Cleanup(t)
+}
+
+// createTestUserViaBiz 通过biz层创建测试用户
+func createTestUserViaBiz(t *testing.T, userBiz user.UserBiz, req *api.CreateUserRequest) *api.UserInfo {
 	ctx := context.Background()
 	var createReq api.CreateUserRequest
 	if req == nil {
@@ -52,173 +38,128 @@ func genNewUser(t *testing.T, db *gorm.DB, req *api.CreateUserRequest) (*api.Cre
 			Password: faker.Password(),
 		}
 	} else {
-		createReq.Email = req.Email
-		createReq.Nickname = req.Nickname
-		createReq.Password = req.Password
+		createReq = *req
 	}
 	err := userBiz.Create(ctx, &createReq)
-	if err != nil {
-		t.Fatal(err)
-		return nil, err
-	}
-	return &createReq, nil
+	require.NoError(t, err)
+	getResp, err := userBiz.Get(ctx, createReq.Email)
+	require.NoError(t, err)
+	userInfo := api.UserInfo(*getResp)
+	return &userInfo
 }
 
 func TestUserBiz_Create_Success(t *testing.T) {
-	db, err := setupUserDatabase()
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	ctx := context.Background()
-	createReq, err := genNewUser(t, db, nil)
-	if err != nil {
-		t.Fatal(err)
-		return
-	}
-	iStore := store.NewStore(db)
-	biz := biz.NewIBiz(iStore)
-	userBiz := biz.Users()
-	userResp, err := userBiz.Get(ctx, createReq.Email)
-	if err != nil {
-		t.Fatal(err)
-		return
-	}
-	assert.True(t, userResp.Email == createReq.Email)
-	assert.True(t, userResp.Nickname == createReq.Nickname)
-}
+	ts, userBiz := setupBizTest(t)
+	defer teardownBizTest(ts, t)
 
-func TestUserBiz_Login_Success(t *testing.T) {
-	db, err := setupUserDatabase()
-	if err != nil {
-		t.Fatalf("failed to setup database: %v", err)
-	}
-	userCreateReq := api.CreateUserRequest{
+	userCreateReq := &api.CreateUserRequest{
 		Email:    faker.Email(),
 		Nickname: faker.Name(),
 		Password: faker.Password(),
 	}
-	_, err = genNewUser(t, db, &userCreateReq)
-	if err != nil {
-		t.Fatalf("failed to create test user: %v", err)
-	}
-	iStore := store.NewStore(db)
-	biz := biz.NewIBiz(iStore)
-	userBiz := biz.Users()
+	createTestUserViaBiz(t, userBiz, userCreateReq)
+
 	ctx := context.Background()
 	loginReq := api.LoginRequest{
 		Email:    userCreateReq.Email,
 		Password: userCreateReq.Password,
 		SeedTime: time.Now().Unix(),
 	}
+
 	userInfo, err := userBiz.Get(ctx, userCreateReq.Email)
-	if err != nil {
-		t.Fatalf("failed to get user info: %v", err)
-	}
+	require.NoError(t, err)
 	userUUID := userInfo.UserUUID
+
 	userResp, err := userBiz.Login(ctx, &loginReq)
-	if err != nil {
-		t.Fatalf("userBiz.Login failed: %v", err)
-	}
+	require.NoError(t, err)
+
 	uuidFormToken, err := token.ParseToken(userResp.Token)
-	if err != nil {
-		t.Fatalf("failed to parse token: %v", err)
-	}
-	assert.True(t, uuidFormToken.UserUUID == userUUID)
+	require.NoError(t, err)
+
+	assert.Equal(t, userUUID, uuidFormToken.UserUUID)
 }
 
-func TestUserChangePassword_Success(t *testing.T) {
-	db, err := setupUserDatabase()
-	if err != nil {
-		t.Fatalf("failed to setup database: %v", err)
-	}
-	userCreateReq := api.CreateUserRequest{
+func TestUserBiz_ChangePassword_Success(t *testing.T) {
+	ts, userBiz := setupBizTest(t)
+	defer teardownBizTest(ts, t)
+
+	userCreateReq := &api.CreateUserRequest{
 		Email:    faker.Email(),
 		Nickname: faker.Name(),
 		Password: faker.Password(),
 	}
-	_, err = genNewUser(t, db, &userCreateReq)
-	if err != nil {
-		t.Fatalf("failed to create test user: %v", err)
-	}
-	iStore := store.NewStore(db)
-	biz := biz.NewIBiz(iStore)
-	userBiz := biz.Users()
+	createTestUserViaBiz(t, userBiz, userCreateReq)
+
 	ctx := context.Background()
 	changePasswordReq := api.ChangePasswordRequest{
 		OldPassword: userCreateReq.Password,
 		NewPassword: faker.Password(),
 	}
-	if err := userBiz.ChangePassword(ctx, userCreateReq.Email, &changePasswordReq); err != nil {
-		t.Fatalf("failed to change password: %v", err)
-	}
+
+	err := userBiz.ChangePassword(ctx, userCreateReq.Email, &changePasswordReq)
+	require.NoError(t, err)
+
 	userInfo, err := userBiz.Get(ctx, userCreateReq.Email)
-	if err != nil {
-		t.Fatalf("failed to get user info: %v", err)
-	}
-	loginReq := api.LoginRequest{
+	require.NoError(t, err)
+	userUUID := userInfo.UserUUID
+
+	// 验证旧密码不能登录
+	oldLoginReq := api.LoginRequest{
 		Email:    userCreateReq.Email,
 		Password: userCreateReq.Password,
 		SeedTime: time.Now().Unix(),
 	}
-	userUUID := userInfo.UserUUID
-	_, err = userBiz.Login(ctx, &loginReq)
-	if err != nil {
-		if err != errno.ErrPasswordIncorrect {
-			t.Fatalf("userBiz.Login failed: %v", err)
-		}
+	_, err = userBiz.Login(ctx, &oldLoginReq)
+	assert.Error(t, err)
+	assert.Equal(t, errno.ErrPasswordIncorrect, err)
+
+	// 验证新密码可以登录
+	newLoginReq := api.LoginRequest{
+		Email:    userCreateReq.Email,
+		Password: changePasswordReq.NewPassword,
+		SeedTime: time.Now().Unix(),
 	}
-	loginReq.Password = changePasswordReq.NewPassword
-	userResp, err := userBiz.Login(ctx, &loginReq)
-	if err != nil {
-		t.Fatalf("userBiz.Login failed: %v", err)
-	}
+	userResp, err := userBiz.Login(ctx, &newLoginReq)
+	require.NoError(t, err)
+
 	uuidFormToken, err := token.ParseToken(userResp.Token)
-	if err != nil {
-		t.Fatalf("failed to parse token: %v", err)
-	}
-	assert.True(t, uuidFormToken.UserUUID == userUUID)
+	require.NoError(t, err)
+
+	assert.Equal(t, userUUID, uuidFormToken.UserUUID)
 }
 
-func TestUserBiz_Update_success(t *testing.T) {
-	db, err := setupUserDatabase()
-	if err != nil {
-		t.Fatalf("failed to setup database: %v", err)
-	}
-	userCreateReq := api.CreateUserRequest{
+func TestUserBiz_Update_Success(t *testing.T) {
+	ts, userBiz := setupBizTest(t)
+	defer teardownBizTest(ts, t)
+
+	userCreateReq := &api.CreateUserRequest{
 		Email:    faker.Email(),
 		Nickname: faker.Name(),
 		Password: faker.Password(),
 	}
-	_, err = genNewUser(t, db, &userCreateReq)
-	if err != nil {
-		t.Fatalf("failed to create test user: %v", err)
-	}
-	iStore := store.NewStore(db)
-	biz := biz.NewIBiz(iStore)
-	userBiz := biz.Users()
+	createTestUserViaBiz(t, userBiz, userCreateReq)
+
 	ctx := context.Background()
 	userInfo, err := userBiz.Get(ctx, userCreateReq.Email)
-	if err != nil {
-		t.Fatalf("failed to get user info: %v", err)
-		return
-	}
+	require.NoError(t, err)
+
 	updateReq := api.UpdateUserRequest{
 		Nickname: faker.Name(),
 		Email:    faker.Email(),
 	}
-	if err := userBiz.Update(ctx, userInfo.UserUUID, userCreateReq.Email, &updateReq); err != nil {
-		t.Fatalf("failed to update user info: %v", err)
-		return
-	}
+
+	err = userBiz.Update(ctx, userInfo.UserUUID, userCreateReq.Email, &updateReq)
+	require.NoError(t, err)
+
+	// 验证旧邮箱不存在
 	_, err = userBiz.Get(ctx, userCreateReq.Email)
-	if err != nil {
-	}
+	assert.Error(t, err)
+
+	// 验证新邮箱存在且信息正确
 	userResp, err := userBiz.Get(ctx, updateReq.Email)
-	if err != nil {
-		t.Fatal(err)
-		return
-	}
-	assert.True(t, userResp.Email == updateReq.Email)
-	assert.True(t, userResp.Nickname == updateReq.Nickname)
+	require.NoError(t, err)
+
+	assert.Equal(t, updateReq.Email, userResp.Email)
+	assert.Equal(t, updateReq.Nickname, userResp.Nickname)
+	assert.Equal(t, userInfo.UserUUID, userResp.UserUUID)
 }

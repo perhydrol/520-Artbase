@@ -9,14 +9,12 @@ import (
 	"demo520/internal/pkg/model"
 	"demo520/pkg/api"
 	"errors"
-	"fmt"
 	"mime/multipart"
 	"path/filepath"
 	"strings"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/google/uuid"
-	"github.com/jinzhu/copier"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -48,9 +46,14 @@ func NewImageBiz(db store.IStore) ImageBiz {
 }
 
 func copyImageInfo(info *api.ImageInfo, imageM *model.NewImageM) error {
-	if err := copier.Copy(info, imageM); err != nil {
-		return fmt.Errorf("failed to copy image data: %w", err)
+	info.ImageUUID = imageM.ImageUUID.String()
+	if len(imageM.Token) != 0 {
+		info.Token = string(imageM.Token)
+	} else {
+		info.Token = ""
 	}
+	info.UserUUID = imageM.UserUUID.String()
+	info.IsPublic = imageM.IsPublic
 	if len(imageM.Tags) > 0 {
 		info.Tags = make([]string, len(imageM.Tags))
 		for i, t := range imageM.Tags {
@@ -68,7 +71,7 @@ func copyImageInfo(info *api.ImageInfo, imageM *model.NewImageM) error {
 
 func (i *imageBiz) Create(ctx context.Context, userUUID string, r *api.CreateImageRequest, fileHeader *multipart.FileHeader) (*api.CreateImageResponse, error) {
 	defer log.FuncEntryWithContext(ctx, userUUID, r, fileHeader)()
-	
+
 	// 参数验证
 	if fileHeader == nil {
 		err := errno.ErrInvalidParameter.SetMessage("file header is required")
@@ -85,8 +88,8 @@ func (i *imageBiz) Create(ctx context.Context, userUUID string, r *api.CreateIma
 	imageMaxSize := config.GetImage().ImageMaxSize
 	if fileHeader.Size > imageMaxSize {
 		err := errno.ErrImageFileTooLarge
-		log.ErrorWithFunc(err, "文件大小超限", 
-			"fileSize", fileHeader.Size, 
+		log.ErrorWithFunc(err, "文件大小超限",
+			"fileSize", fileHeader.Size,
 			"maxSize", imageMaxSize)
 		return nil, err
 	}
@@ -183,8 +186,8 @@ func (i *imageBiz) UpdateTags(ctx context.Context, userUUID string, imageUUID st
 	// 权限验证
 	if imageM.UserUUID.String() != userUUID {
 		err := errno.ErrUnauthorized.SetMessage("access denied for image %s", imageUUID)
-		log.ErrorWithFunc(err, "用户无权限操作该图片", 
-			"requestUserUUID", userUUID, 
+		log.ErrorWithFunc(err, "用户无权限操作该图片",
+			"requestUserUUID", userUUID,
 			"imageOwnerUUID", imageM.UserUUID.String())
 		return err
 	}

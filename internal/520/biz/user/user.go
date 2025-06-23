@@ -10,7 +10,6 @@ import (
 	"demo520/pkg/auth"
 	"demo520/pkg/token"
 	"errors"
-	"regexp"
 	"time"
 
 	"github.com/asaskevich/govalidator"
@@ -48,8 +47,7 @@ func (u *userBiz) ChangePassword(ctx context.Context, email string, r *api.Chang
 			log.ErrorWithFunc(err, "旧密码验证失败", "email", email)
 			return err
 		}
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			err := errno.ErrUserNotFound
+		if errors.Is(err, errno.ErrUserNotFound) {
 			log.ErrorWithFunc(err, "用户不存在", "email", email)
 			return err
 		}
@@ -110,13 +108,20 @@ func (u *userBiz) Create(ctx context.Context, r *api.CreateUserRequest) error {
 	defer log.FuncEntryWithContext(ctx, r.Email, "***")()
 
 	var userM model.UserM
-	userM.Email = r.Email
-	userM.Nickname = r.Nickname
-	userM.Password = r.Password
-	userM.UserUUID = uuid.New().String()
+	if ok, err := govalidator.ValidateStruct(r); ok && err == nil {
+		userM.Email = r.Email
+		userM.Nickname = r.Nickname
+		userM.Password = r.Password
+		userM.UserUUID = uuid.New().String()
+	} else {
+		if errs, ok := err.(govalidator.Errors); ok {
+			return errno.ErrInvalidParameter.SetMessage("validation failed: %s", errs.Error())
+		}
+		return errno.ErrInvalidParameter.SetMessage("validation failed: %v", err)
+	}
 
 	if err := u.db.User().Create(ctx, &userM); err != nil {
-		if match, _ := regexp.MatchString("Duplicate entry '.*' for key 'username'", err.Error()); match {
+		if store.IsDuplicateKeyError(err) {
 			return errno.ErrUserAlreadyExist
 		}
 		return errno.InternalServerError.SetMessage("failed to create user: %v", err)

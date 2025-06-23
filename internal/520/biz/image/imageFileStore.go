@@ -19,7 +19,7 @@ import (
 
 var (
 	imageFileStoreOnce sync.Once
-	this               *imageFileStore
+	instance           *imageFileStore
 )
 
 type ImageFileStore interface {
@@ -40,9 +40,9 @@ var _ ImageFileStore = (*imageFileStore)(nil)
 
 func NewImageFileStore() ImageFileStore {
 	imageFileStoreOnce.Do(func() {
-		this = &imageFileStore{baseDir: config.GetImage().ImageDir, imageConverter: convert.InitImageConverter()}
+		instance = &imageFileStore{baseDir: config.GetImage().ImageDir, imageConverter: convert.InitImageConverter()}
 	})
-	return this
+	return instance
 }
 
 func (i *imageFileStore) Save(fileHeader *multipart.FileHeader, hash string) error {
@@ -81,14 +81,12 @@ func (i *imageFileStore) Save(fileHeader *multipart.FileHeader, hash string) err
 	// 创建目标文件（使用更安全的文件名）
 	fileName := fmt.Sprintf("%s%s", hash, filepath.Ext(fileHeader.Filename))
 	filePath := filepath.Join(fullDirPath, fileName)
-	saveSrcFileErr := helper.WriteFile(filePath, srcFile)
-	if saveSrcFileErr != nil {
-		return saveSrcFileErr
+	if err := helper.WriteFile(filePath, srcFile); err != nil {
+		return err
 	}
-	convertErr := i.imageConverter.ConvertImage(filePath)
-	if convertErr != nil {
-		log.Errorw("Convert image file failed", "filePath", filePath, "err", convertErr)
-		return convertErr
+	if err := i.imageConverter.ConvertImage(filePath); err != nil {
+		log.Errorw("Convert image file failed", "filePath", filePath, "err", err)
+		return err
 	}
 	return nil
 }
@@ -103,14 +101,14 @@ func (i *imageFileStore) Validate(fileHeader *multipart.FileHeader) (bool, error
 	}
 	defer file.Close()
 
-	mtype, err := mimetype.DetectReader(file)
+	mimeType, err := mimetype.DetectReader(file)
 	if err != nil {
 		return false, err
 	}
-	isImage := mtype.Is("image/jpeg") ||
-		mtype.Is("image/png") ||
-		mtype.Is("image/gif") ||
-		mtype.Is("image/webp")
+	isImage := mimeType.Is("image/jpeg") ||
+		mimeType.Is("image/png") ||
+		mimeType.Is("image/gif") ||
+		mimeType.Is("image/webp")
 	return isImage, nil
 }
 
@@ -118,11 +116,11 @@ func (i *imageFileStore) IsContainerImage(hash string) (bool, error) {
 	if hash == "" {
 		return false, fmt.Errorf("hash cannot be empty")
 	}
-	fileDir, genFileDirErr := genPathDir(hash)
-	if genFileDirErr != nil {
-		return false, fmt.Errorf("generate pathDir failed: %w", genFileDirErr)
+	fileDir, err := genPathDir(hash)
+	if err != nil {
+		return false, fmt.Errorf("generate pathDir failed: %w", err)
 	}
-	fileInfo, err := os.Stat(fileDir)
+	fileInfo, err := os.Stat(filepath.Join(i.baseDir, fileDir))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
