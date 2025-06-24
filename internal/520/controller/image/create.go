@@ -6,7 +6,9 @@ import (
 	"demo520/internal/pkg/errno"
 	"demo520/internal/pkg/log"
 	"demo520/pkg/api"
+	"encoding/json"
 
+	"github.com/asaskevich/govalidator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -24,9 +26,23 @@ func (ctrl *ImageController) Create(ctx *gin.Context) {
 
 	// 解析表单数据
 	var r api.CreateImageRequest
-	if err := ctx.ShouldBind(&r); err != nil {
-		log.ErrorWithFunc(err, "请求参数绑定失败")
+	metadataStr := ctx.PostForm("json")
+	if metadataStr == "" {
+		core.WriteResponse(ctx, errno.ErrImageJSONNotFound, nil)
+		return
+	}
+	if !govalidator.IsJSON(metadataStr) {
+		core.WriteResponse(ctx, errno.ErrImageJSONInvalid, nil)
+		return
+	}
+
+	if err := json.Unmarshal([]byte(metadataStr), &r); err != nil {
 		core.WriteResponse(ctx, errno.ErrBind, nil)
+		return
+	}
+
+	if _, err := govalidator.ValidateStruct(r); err != nil {
+		core.WriteResponse(ctx, errno.ErrInvalidParameter, nil)
 		return
 	}
 

@@ -1,14 +1,16 @@
 package model
 
 import (
-	"gorm.io/gorm"
 	"time"
+
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 type ImageTagM struct {
-	ID        uint   `gorm:"primary_key"`
-	Tag       string `gorm:"type:varchar(255);column:tag;not null;index:tag_image;collate:utf8mb4_unicode_ci" json:"tag"`
-	ImageUUID string `gorm:"type:char(36);not null;index:tag_image;column:imageUUID"`
+	ID        uint              `gorm:"primary_key"`
+	Tag       string            `gorm:"type:varchar(255);column:tag;not null;index:tag_image;collate:utf8mb4_unicode_ci" json:"tag"`
+	ImageUUID datatypes.BinUUID `gorm:"type:binary(16);index:tag_image;column:imageUUID"`
 	CreatedAt time.Time
 	DeletedAt gorm.DeletedAt `gorm:"index"`
 }

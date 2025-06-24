@@ -2,12 +2,14 @@ package main
 
 import (
 	demo520 "demo520/internal/520"
+	"demo520/internal/pkg/config"
 	"demo520/internal/pkg/log"
 	"os"
 )
 
 // Go 程序的默认入口函数(主函数).
 func main() {
+	config.Init("")
 	command := demo520.NewCommand()
 	// 初始化日志
 	log.Init(demo520.LogOptions())

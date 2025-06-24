@@ -311,16 +311,11 @@ paths:
         201:
           description: User created successfully
         400:
-          $ref: "#/components/responses/ValidationError"
-        400:
           description: Bad Request - User already exists
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-              example:
-                code: "FailedOperation.UserAlreadyExist"
-                message: "User already exist"
         429:
           $ref: "#/components/responses/TooManyRequestsError"
 
@@ -349,18 +344,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-              example:
-                code: "ResourceNotFound.UserNotFoundOrPasswordIncorrect"
-                message: "Incorrect username or password"
         404:
           description: User not found
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-              example:
-                code: "ResourceNotFound.UserNotFoundOrPasswordIncorrect"
-                message: "Incorrect username or password"
         429:
           $ref: "#/components/responses/TooManyRequestsError"
 
@@ -442,8 +431,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UserInfo"
-        400:
-          $ref: "#/components/responses/ValidationError"
         401:
           $ref: "#/components/responses/UnauthorizedError"
         403:
@@ -542,34 +529,48 @@ paths:
           $ref: "#/components/responses/TooManyRequestsError"
 
   /images/user/{user_uuid}/images:
-    get:
-      tags: [Images]
-      summary: 获取对应用户UUID下的的图片列表
-      description: 获取图片列表
-      operationId: listImages
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: user_uuid
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-          description: 用户UUID
-        - $ref: "#/components/parameters/PaginationLimit"
-        - $ref: "#/components/parameters/PaginationOffset"
-      responses:
-        200:
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ListImageResponse"
-        401:
-          $ref: "#/components/responses/UnauthorizedError"
-        429:
-          $ref: "#/components/responses/TooManyRequestsError"
+  get:
+    tags: [Images]
+    summary: 获取对应用户 UUID 下的图片列表
+    description: 获取指定用户的图片资源列表，支持分页查询
+    operationId: listImages
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: user_uuid
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: 用户 UUID
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+        description: 分页偏移量，默认从第 0 条开始
+      - name: limit
+        in: query
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+        description: 每页返回的图片数量，最大值为 100
+    responses:
+      200:
+        description: 成功返回图片列表
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListImageResponse"
+      401:
+        $ref: "#/components/responses/UnauthorizedError"
+      429:
+        $ref: "#/components/responses/TooManyRequestsError"
 
   /images/{image_uuid}:
     get:

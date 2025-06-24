@@ -166,7 +166,7 @@ func CreateTestImages(t *testing.T, db *gorm.DB, userUUID string, count int) []*
 func CreateTestImageTag(t *testing.T, db *gorm.DB, imageUUID string, tag string) *model.ImageTagM {
 	imageTag := &model.ImageTagM{
 		Tag:       tag,
-		ImageUUID: imageUUID,
+		ImageUUID: datatypes.BinUUIDFromString(imageUUID),
 		CreatedAt: time.Now(),
 	}
 

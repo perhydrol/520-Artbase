@@ -13,6 +13,9 @@ import (
 )
 
 func installRouters(g *gin.Engine) error {
+	// 添加请求追踪中间件
+	g.Use(middleware.RequestTracing())
+
 	// 注册 404 Handler.
 	g.NoRoute(func(c *gin.Context) {
 		core.WriteResponse(c, errno.ErrPageNotFound, nil)

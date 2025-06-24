@@ -130,7 +130,7 @@ func (i *imageBiz) Create(ctx context.Context, userUUID string, r *api.CreateIma
 	for _, tag := range r.Tags {
 		imageTags = append(imageTags, model.ImageTagM{
 			Tag:       tag,
-			ImageUUID: imageUUID.String(),
+			ImageUUID: datatypes.BinUUID(imageUUID),
 		})
 	}
 

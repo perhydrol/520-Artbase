@@ -9,6 +9,8 @@ db:
     max-open-connections: 100
     max-connection-life-time: 10s
     log-level: 1
+get_image:
+    random_public_limit: 50
 image:
     ImageMaxSize: 20971520
     image_dir: temp_image

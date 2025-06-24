@@ -60,49 +60,95 @@ func (u *userBiz) ChangePassword(ctx context.Context, email string, r *api.Chang
 }
 
 func (u *userBiz) Login(ctx context.Context, r *api.LoginRequest) (*api.LoginResponse, error) {
-	defer log.FuncEntryWithContext(ctx, r.Email, "***", r.SeedTime)()
+	defer log.C(ctx).FuncEntryWithContext(ctx, r.Email, "***", r.SeedTime)()
+
+	log.C(ctx).Infow("Business layer login started",
+		"email", r.Email,
+		"seed_time", r.SeedTime,
+	)
 
 	var t time.Time
 
 	// 自动检测时间戳单位（秒或毫秒）
+	log.C(ctx).Debugw("Parsing seed time", "seed_time", r.SeedTime)
 	switch {
 	case r.SeedTime > 1e18: // 纳秒（通常不需要处理）
 		t = time.Unix(0, r.SeedTime)
+		log.C(ctx).Debugw("Detected nanosecond timestamp")
 	case r.SeedTime > 1e15: // 微秒
 		t = time.Unix(0, r.SeedTime*1e3)
+		log.C(ctx).Debugw("Detected microsecond timestamp")
 	case r.SeedTime > 1e12: // 毫秒
 		t = time.Unix(r.SeedTime/1000, (r.SeedTime%1000)*1e6)
+		log.C(ctx).Debugw("Detected millisecond timestamp")
 	default: // 秒
 		t = time.Unix(r.SeedTime, 0)
+		log.C(ctx).Debugw("Detected second timestamp")
 	}
 
 	now := time.Now().UTC()
 	utcTime := t.UTC()
 	duration := now.Sub(utcTime)
 	timeout := time.Duration(config.GetLogin().TimingAttackProtection) * time.Minute
+
+	log.C(ctx).Debugw("Validating request timing",
+		"current_time", now,
+		"request_time", utcTime,
+		"duration", duration.String(),
+		"timeout", timeout.String(),
+	)
+
 	if duration < 0 || duration >= timeout {
 		err := errno.ErrUserLoginRequestOutTime
-		log.ErrorWithFunc(err, "登录请求时间超时",
+		log.C(ctx).ErrorWithFunc(err, "登录请求时间超时",
 			"email", r.Email,
 			"seedTime", r.SeedTime,
-			"duration", duration.String())
+			"duration", duration.String(),
+			"timeout", timeout.String())
 		return nil, err
 	}
 
+	log.C(ctx).Infow("Fetching user from database", "email", r.Email)
 	userM, err := u.db.User().Get(ctx, r.Email)
 	if err != nil {
-		log.ErrorWithFunc(err, "获取用户信息失败", "email", r.Email)
+		log.C(ctx).ErrorWithFunc(err, "获取用户信息失败", "email", r.Email)
 		return nil, errno.ErrUserNotFound
 	}
 
+	log.C(ctx).Infow("User found, verifying password",
+		"email", r.Email,
+		"user_uuid", userM.UserUUID,
+		"created_at", userM.CreatedAt,
+	)
+
 	if !auth.VerifyPassword(r.Password, userM.Password) {
+		log.C(ctx).Warnw("Password verification failed",
+			"email", r.Email,
+			"user_uuid", userM.UserUUID,
+		)
 		return nil, errno.ErrPasswordIncorrect
 	}
 
+	log.C(ctx).Infow("Password verification successful, generating JWT token",
+		"email", r.Email,
+		"user_uuid", userM.UserUUID,
+	)
+
 	jwt, err := token.GenerateToken(userM.UserUUID)
 	if err != nil {
+		log.C(ctx).ErrorWithFunc(err, "JWT token generation failed",
+			"email", r.Email,
+			"user_uuid", userM.UserUUID,
+		)
 		return nil, err
 	}
+
+	log.C(ctx).Infow("Login completed successfully",
+		"email", r.Email,
+		"user_uuid", userM.UserUUID,
+		"token_length", len(jwt),
+	)
+
 	return &api.LoginResponse{Token: jwt}, nil
 }
 
